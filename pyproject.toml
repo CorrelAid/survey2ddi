@@ -1,0 +1,19 @@
+[project]
+name = "kobo2ddi"
+version = "0.1.0"
+description = "Transform KoboToolbox survey data into a DDI-adjacent format"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx",
+    "openpyxl",
+    "python-dotenv",
+    "xlrd>=2.0.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+kobo2ddi = "kobo2ddi.cli:main"
