@@ -13,19 +13,19 @@ SCHEMA_LOC = "ddi:codebook:2_5 https://ddialliance.org/Specification/DDI-Codeboo
 
 # Type → (intrvl attribute, varFormat/@type)
 DDI_TYPE_MAP = {
-    "select_one":       ("discrete",   "numeric"),
-    "select_multiple":  ("discrete",   "character"),
-    "rank":             ("discrete",   "numeric"),
-    "integer":          ("continuous",  "numeric"),
-    "decimal":          ("continuous",  "numeric"),
-    "range":            ("continuous",  "numeric"),
-    "calculate":        ("continuous",  "numeric"),
-    "string":           ("discrete",   "character"),
-    "date":             ("discrete",   "character"),
-    "time":             ("discrete",   "character"),
-    "datetime":         ("discrete",   "character"),
-    "acknowledge":      ("discrete",   "numeric"),
-    "hidden":           ("discrete",   "character"),
+    "select_one":       ("discrete",  "numeric"),
+    "select_multiple":  ("discrete",  "character"),
+    "rank":             ("discrete",  "numeric"),
+    "integer":          ("contin",    "numeric"),
+    "decimal":          ("contin",    "numeric"),
+    "range":            ("contin",    "numeric"),
+    "calculate":        ("contin",    "numeric"),
+    "string":           ("discrete",  "character"),
+    "date":             ("discrete",  "character"),
+    "time":             ("discrete",  "character"),
+    "datetime":         ("discrete",  "character"),
+    "acknowledge":      ("discrete",  "numeric"),
+    "hidden":           ("discrete",  "character"),
 }
 
 
@@ -56,17 +56,17 @@ def build_ddi_xml(
     SubElement(titl_stmt, "titl").text = asset_name
     study_id = settings.get("id_string", "")
     if study_id:
-        SubElement(titl_stmt, "IDno").text = str(study_id)
-
-    ver = settings.get("version", "")
-    if ver:
-        ver_stmt = SubElement(citation, "verStmt")
-        SubElement(ver_stmt, "version").text = str(ver)
+        SubElement(titl_stmt, "IDNo").text = str(study_id)
 
     prod_stmt = SubElement(citation, "prodStmt")
     SubElement(prod_stmt, "prodDate", date=date.today().isoformat()).text = (
         date.today().isoformat()
     )
+
+    ver = settings.get("version", "")
+    if ver:
+        ver_stmt = SubElement(citation, "verStmt")
+        SubElement(ver_stmt, "version").text = str(ver)
 
     # --- dataDscr ---
     data_dscr = SubElement(root, "dataDscr")
@@ -82,7 +82,7 @@ def build_ddi_xml(
     for group_name, var_ids in groups.items():
         SubElement(
             data_dscr, "varGrp",
-            name=group_name, type="Section", var=" ".join(var_ids),
+            name=group_name, type="section", var=" ".join(var_ids),
         )
 
     # Variables

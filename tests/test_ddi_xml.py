@@ -1,10 +1,16 @@
 """Tests for kobo2ddi.ddi_xml — DDI-Codebook 2.5 XML generation."""
 
+import subprocess
+from pathlib import Path
 from xml.etree.ElementTree import fromstring
+
+import pytest
 
 from kobo2ddi.ddi_xml import build_ddi_xml
 
 NS = {"ddi": "ddi:codebook:2_5"}
+SCHEMA_DIR = Path(__file__).parent / "schemas"
+SCHEMA_PATH = SCHEMA_DIR / "codebook.xsd"
 
 
 def _parse(xml_str: str):
@@ -36,7 +42,7 @@ class TestBuildDdiXml:
     def test_study_id(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
-        idno = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:IDno", NS)
+        idno = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:IDNo", NS)
         assert idno is not None
         assert idno.text == "test_survey_2025"
 
@@ -55,7 +61,7 @@ class TestBuildDdiXml:
         assert "demo" in grp_names
         assert "feedback" in grp_names
         for g in var_grps:
-            assert g.get("type") == "Section"
+            assert g.get("type") == "section"
             assert g.get("var")  # has variable IDs
 
     def test_variable_count(self, survey_rows, choices_by_list, settings, submissions):
@@ -127,20 +133,20 @@ class TestBuildDdiXml:
         assert fmt(by_name["rating"]) == "numeric"
         assert fmt(by_name["visit_date"]) == "character"
 
-    def test_continuous_vs_discrete(self, survey_rows, choices_by_list, settings, submissions):
+    def test_contin_vs_discrete(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
         by_name = {v.get("name"): v for v in variables}
-        assert by_name["age"].get("intrvl") == "continuous"
-        assert by_name["score"].get("intrvl") == "continuous"
+        assert by_name["age"].get("intrvl") == "contin"
+        assert by_name["score"].get("intrvl") == "contin"
         assert by_name["gender"].get("intrvl") == "discrete"
         assert by_name["full_name"].get("intrvl") == "discrete"
 
     def test_no_idno_when_missing(self, survey_rows, choices_by_list, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, {}, submissions)
         root = _parse(xml)
-        idno = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:IDno", NS)
+        idno = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:IDNo", NS)
         assert idno is None
 
     def test_vargrp_before_var_elements(self, survey_rows, choices_by_list, settings, submissions):
@@ -152,3 +158,27 @@ class TestBuildDdiXml:
         first_grp_idx = next(i for i, c in enumerate(children) if c.tag.endswith("varGrp"))
         first_var_idx = next(i for i, c in enumerate(children) if c.tag.endswith("}var") or c.tag == "var")
         assert first_grp_idx < first_var_idx
+
+
+class TestXsdValidation:
+    """Validate generated XML against the official DDI-Codebook 2.5 XSD."""
+
+    @pytest.fixture
+    def xml_file(self, tmp_path, survey_rows, choices_by_list, settings, submissions):
+        xml_str = build_ddi_xml("Test Survey", survey_rows, choices_by_list, settings, submissions)
+        path = tmp_path / "test.xml"
+        path.write_text(xml_str, encoding="utf-8")
+        return path
+
+    @pytest.mark.skipif(
+        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
+        reason="xmllint not available",
+    )
+    def test_validates_against_ddi_codebook_25_xsd(self, xml_file):
+        result = subprocess.run(
+            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(xml_file)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, (
+            f"XSD validation failed:\n{result.stderr}"
+        )
