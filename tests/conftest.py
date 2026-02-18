@@ -8,20 +8,20 @@ from pathlib import Path
 # -- Reusable survey data as plain dicts (same shape as parse_xlsform output) --
 
 SURVEY_ROWS = [
-    {"type": "begin_group", "name": "demo", "label": None, "required": "false"},
-    {"type": "text", "name": "full_name", "label": "Full name", "required": "true"},
-    {"type": "integer", "name": "age", "label": "Age", "required": "true"},
-    {"type": "select_one gender", "name": "gender", "label": "Gender", "required": "false"},
-    {"type": "select_multiple hobbies", "name": "hobbies", "label": "Hobbies", "required": "false"},
-    {"type": "end_group", "name": None, "label": None, "required": None},
-    {"type": "begin_group", "name": "feedback", "label": None, "required": "false"},
-    {"type": "select_one likert", "name": "satisfaction", "label": "How satisfied are you?", "required": "true"},
-    {"type": "range", "name": "score", "label": "Score (0-100)", "required": "false"},
-    {"type": "decimal", "name": "rating", "label": "Rating", "required": "false"},
-    {"type": "date", "name": "visit_date", "label": "Date of visit", "required": "false"},
-    {"type": "calculate", "name": "calc_field", "label": "Computed", "required": "false"},
-    {"type": "end_group", "name": None, "label": None, "required": None},
-    {"type": "note", "name": "thanks", "label": "Thank you!", "required": "false"},
+    {"type": "begin_group", "name": "demo", "label": None, "required": "false", "appearance": None},
+    {"type": "text", "name": "full_name", "label": "Full name", "required": "true", "appearance": None},
+    {"type": "integer", "name": "age", "label": "Age", "required": "true", "appearance": None},
+    {"type": "select_one gender", "name": "gender", "label": "Gender", "required": "false", "appearance": None},
+    {"type": "select_multiple hobbies", "name": "hobbies", "label": "Hobbies", "required": "false", "appearance": None},
+    {"type": "end_group", "name": None, "label": None, "required": None, "appearance": None},
+    {"type": "begin_group", "name": "feedback", "label": None, "required": "false", "appearance": None},
+    {"type": "select_one likert", "name": "satisfaction", "label": "How satisfied are you?", "required": "true", "appearance": "likert"},
+    {"type": "range", "name": "score", "label": "Score (0-100)", "required": "false", "appearance": None},
+    {"type": "decimal", "name": "rating", "label": "Rating", "required": "false", "appearance": None},
+    {"type": "date", "name": "visit_date", "label": "Date of visit", "required": "false", "appearance": None},
+    {"type": "calculate", "name": "calc_field", "label": "Computed", "required": "false", "appearance": None},
+    {"type": "end_group", "name": None, "label": None, "required": None, "appearance": None},
+    {"type": "note", "name": "thanks", "label": "Thank you!", "required": "false", "appearance": None},
 ]
 
 CHOICES_BY_LIST = {
@@ -104,9 +104,9 @@ def xlsform_path(tmp_path):
     # survey sheet
     ws = wb.active
     ws.title = "survey"
-    ws.append(["type", "name", "label::English", "required"])
+    ws.append(["type", "name", "label::English", "required", "appearance"])
     for row in SURVEY_ROWS:
-        ws.append([row["type"], row["name"], row.get("label"), row.get("required")])
+        ws.append([row["type"], row["name"], row.get("label"), row.get("required"), row.get("appearance")])
 
     # choices sheet
     ws_c = wb.create_sheet("choices")

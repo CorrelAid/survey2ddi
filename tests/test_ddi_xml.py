@@ -149,6 +149,19 @@ class TestBuildDdiXml:
         idno = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:IDNo", NS)
         assert idno is None
 
+    def test_nature_attribute(self, survey_rows, choices_by_list, settings, submissions):
+        xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
+        root = _parse(xml)
+        variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
+        by_name = {v.get("name"): v for v in variables}
+        assert by_name["age"].get("nature") == "ratio"
+        assert by_name["gender"].get("nature") == "nominal"
+        assert by_name["satisfaction"].get("nature") == "ordinal"
+        assert by_name["visit_date"].get("nature") == "interval"
+        # string and calculate have no nature attribute
+        assert by_name["full_name"].get("nature") is None
+        assert by_name["calc_field"].get("nature") is None
+
     def test_vargrp_before_var_elements(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)

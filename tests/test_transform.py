@@ -65,6 +65,31 @@ class TestExtractVariables:
         assert by_name["gender"]["source_type"] == "select_one gender"
         assert by_name["full_name"]["source_type"] == "text"
 
+    def test_measure_inference(self, survey_rows, choices_by_list):
+        variables = extract_variables(survey_rows, choices_by_list)
+        by_name = {v["name"]: v for v in variables}
+        assert by_name["full_name"]["measure"] == ""  # string → empty
+        assert by_name["age"]["measure"] == "ratio"
+        assert by_name["gender"]["measure"] == "nominal"
+        assert by_name["hobbies"]["measure"] == "nominal"
+        assert by_name["satisfaction"]["measure"] == "ordinal"  # likert
+        assert by_name["score"]["measure"] == "ratio"
+        assert by_name["rating"]["measure"] == "ratio"
+        assert by_name["visit_date"]["measure"] == "interval"
+        assert by_name["calc_field"]["measure"] == ""  # calculate → empty
+
+    def test_likert_detected_by_list_name(self):
+        rows = [{"type": "select_one likert_scale", "name": "q1", "label": "Q1", "required": "false"}]
+        choices = {"likert_scale": [{"name": "1", "label": "Low"}, {"name": "2", "label": "High"}]}
+        variables = extract_variables(rows, choices)
+        assert variables[0]["measure"] == "ordinal"
+
+    def test_likert_detected_by_appearance(self):
+        rows = [{"type": "select_one mylist", "name": "q1", "label": "Q1", "required": "false", "appearance": "likert"}]
+        choices = {"mylist": [{"name": "1", "label": "Low"}, {"name": "2", "label": "High"}]}
+        variables = extract_variables(rows, choices)
+        assert variables[0]["measure"] == "ordinal"
+
     def test_unknown_type_passed_through(self):
         rows = [{"type": "newtype", "name": "x", "label": "X", "required": "false"}]
         variables = extract_variables(rows, {})
@@ -130,7 +155,7 @@ class TestBuildWorkbook:
         wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
         ws = wb["variables"]
         header = [cell.value for cell in ws[1]]
-        assert header == ["name", "group", "label", "type", "values", "required", "source_type"]
+        assert header == ["name", "group", "label", "type", "measure", "values", "required", "source_type"]
 
     def test_variables_sheet_row_count(self, survey_rows, choices_by_list, settings, submissions):
         wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)

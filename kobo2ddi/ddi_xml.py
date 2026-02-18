@@ -88,10 +88,10 @@ def build_ddi_xml(
     # Variables
     for v in variables:
         intrvl, fmt_type = DDI_TYPE_MAP.get(v["type"], ("discrete", "character"))
-        var_el = SubElement(
-            data_dscr, "var",
-            ID=v["_id"], name=v["name"], intrvl=intrvl,
-        )
+        var_attrs = {"ID": v["_id"], "name": v["name"], "intrvl": intrvl}
+        if v.get("measure"):
+            var_attrs["nature"] = v["measure"]
+        var_el = SubElement(data_dscr, "var", **var_attrs)
 
         SubElement(var_el, "labl").text = v["label"]
 

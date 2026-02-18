@@ -30,6 +30,19 @@ TYPE_MAP = {
     "hidden": "hidden",
 }
 
+# Standardized type → measurement level (empty = leave for user to fill in)
+MEASURE_MAP = {
+    "select_one": "nominal",
+    "select_multiple": "nominal",
+    "rank": "ordinal",
+    "integer": "ratio",
+    "decimal": "ratio",
+    "range": "ratio",
+    "date": "interval",
+    "time": "interval",
+    "datetime": "interval",
+}
+
 
 def parse_xlsform(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
     """Parse an XLSForm xlsx into (survey_rows, choices_by_list, settings).
@@ -136,11 +149,19 @@ def extract_variables(
         group = "/".join(group_stack) if group_stack else ""
         data_key = f"{group}/{name}" if group else name
 
+        # Infer measurement level
+        measure = MEASURE_MAP.get(std_type, "")
+        if std_type == "select_one":
+            appearance = str(row.get("appearance", "") or "").lower()
+            if "likert" in (list_name or "").lower() or "likert" in appearance:
+                measure = "ordinal"
+
         variables.append({
             "name": name,
             "group": group,
             "label": str(row.get(label_col, "") or ""),
             "type": std_type,
+            "measure": measure,
             "list_name": list_name or "",
             "choices": choices,
             "values": values_str,
@@ -172,7 +193,7 @@ def build_workbook(
     # Sheet 1: variables
     ws_var = wb.active
     ws_var.title = "variables"
-    var_headers = ["name", "group", "label", "type", "values", "required", "source_type"]
+    var_headers = ["name", "group", "label", "type", "measure", "values", "required", "source_type"]
     ws_var.append(var_headers)
     for v in variables:
         ws_var.append([v[h] for h in var_headers])
