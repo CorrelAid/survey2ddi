@@ -2,7 +2,7 @@
 
 Used by `test_ddi_xml.py` to validate generated XML against the official schema.
 
-**Source:** https://ddialliance.org/hubfs/Specification/DDI-Codebook/2.5/XMLSchema/
+**Source:** [DDI-Codebook 2.5 specification](https://ddialliance.org/Specification/DDI-Codebook/2.5/) — XSD files downloaded from `https://ddialliance.org/hubfs/Specification/DDI-Codebook/2.5/XMLSchema/codebook.xsd` and its dependencies.
 
 **Entry point:** `codebook.xsd` — this is the schema we validate against.
 

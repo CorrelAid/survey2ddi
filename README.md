@@ -78,6 +78,22 @@ workbook = build_workbook(asset["name"], survey_rows, choices, settings, submiss
 xml_string = build_ddi_xml(asset["name"], survey_rows, choices, settings, submissions)
 ```
 
+## Validating XML against the DDI schema
+
+To verify that a generated XML file is valid DDI-Codebook 2.5, use `xmllint` (pre-installed on macOS, available via `libxml2` on Linux):
+
+```
+xmllint --noout --schema tests/schemas/codebook.xsd output/<uid>/<uid>.xml
+```
+
+A successful result looks like:
+
+```
+output/aoBaD9xB5fgsMV2Z8v3vuo/aoBaD9xB5fgsMV2Z8v3vuo.xml validates
+```
+
+The schema files in `tests/schemas/` are the official DDI-Codebook 2.5 XSD from the [DDI Alliance](https://ddialliance.org/Specification/DDI-Codebook/2.5/) (entry point: [codebook.xsd](https://ddialliance.org/hubfs/Specification/DDI-Codebook/2.5/XMLSchema/codebook.xsd)).
+
 ## Running tests
 
 ```
