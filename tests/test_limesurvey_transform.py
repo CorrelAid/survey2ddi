@@ -153,6 +153,28 @@ class TestNormalizeResponses:
         result = normalize_responses(lime_variables, [row])
         assert result[0]["bereiche"] == ""
 
+    def test_select_multiple_ambiguous_prefix_raises(self):
+        """Two choice codes sharing the same 5-char prefix → ValueError, not silent wrong data."""
+        from kobo2ddi.transform import extract_variables
+        rows = [{"type": "select_multiple tags", "name": "tags", "label": "Tags", "required": "false"}]
+        # "optie_a" and "optie_b" both truncate to "optie" in LimeSurvey bracket keys
+        choices = {"tags": [{"name": "optie_a", "label": "A"}, {"name": "optie_b", "label": "B"}]}
+        variables = extract_variables(rows, choices)
+        response = [{"tags[optie]": "Yes"}]
+        with pytest.raises(ValueError, match="Ambiguous"):
+            normalize_responses(variables, response)
+
+    def test_select_multiple_unknown_bracket_key_warns(self):
+        """Bracket key with no matching choice code → warning, raw key used."""
+        from kobo2ddi.transform import extract_variables
+        rows = [{"type": "select_multiple opts", "name": "opts", "label": "Opts", "required": "false"}]
+        choices = {"opts": [{"name": "alpha", "label": "Alpha"}]}
+        variables = extract_variables(rows, choices)
+        response = [{"opts[zzzzz]": "Yes"}]  # "zzzzz" matches nothing
+        with pytest.warns(UserWarning, match="did not match any XLSForm choice code"):
+            result = normalize_responses(variables, response)
+        assert result[0]["opts"] == "zzzzz"  # raw key preserved
+
     def test_select_multiple_multiple_selected(self, lime_variables):
         """Multiple "Yes" sub-columns → space-separated codes."""
         row = {

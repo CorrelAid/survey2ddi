@@ -1,5 +1,6 @@
 """Transform LimeSurvey data into the DDI-adjacent xlsx and XML formats."""
 
+import warnings
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -35,13 +36,47 @@ def normalize_responses(
     ``kobo2ddi.transform.build_workbook``.
     """
     def _match_choice(subkey: str, choices: list[dict]) -> str:
-        """Return the full choice code whose name prefix-matches *subkey*."""
-        for c in choices:
-            code = c["name"]
-            # LimeSurvey truncates to 5 chars; one is a prefix of the other
-            if code == subkey or code.startswith(subkey) or subkey.startswith(code):
-                return code
-        return subkey  # fall back to the raw subkey
+        """Return the XLSForm choice code that matches the LimeSurvey bracket *subkey*.
+
+        LimeSurvey truncates option codes to 5 characters in bracket keys, so
+        prefix matching is used to recover the original code.  Exact match is
+        preferred; a single unambiguous prefix match is accepted.
+
+        Raises ValueError if multiple choices share the same truncated prefix
+        (ambiguous — would silently produce wrong data).
+
+        Falls back to the raw *subkey* with a warning when no choice matches,
+        which can happen if LimeSurvey uses internal codes not derived from the
+        XLSForm choice names.
+        """
+        # Exact match first (no truncation occurred, or code is ≤5 chars)
+        exact = [c["name"] for c in choices if c["name"] == subkey]
+        if exact:
+            return exact[0]
+
+        # Prefix match: LimeSurvey truncated the code
+        prefix_matches = [
+            c["name"] for c in choices
+            if c["name"].startswith(subkey) or subkey.startswith(c["name"])
+        ]
+        if len(prefix_matches) == 1:
+            return prefix_matches[0]
+        if len(prefix_matches) > 1:
+            raise ValueError(
+                f"Ambiguous select_multiple bracket key {subkey!r} matches multiple "
+                f"choice codes: {prefix_matches}. Choice codes must be unique in "
+                "their first 5 characters for LimeSurvey export to be unambiguous."
+            )
+
+        # No match — LimeSurvey may be using internal codes unrelated to XLSForm names.
+        # Return the raw key so data is preserved, but warn the user.
+        warnings.warn(
+            f"select_multiple bracket key {subkey!r} did not match any XLSForm "
+            "choice code. Using raw key. LimeSurvey may be using internal answer "
+            "codes not derived from the XLSForm choice names — check your form.xlsx.",
+            stacklevel=4,
+        )
+        return subkey
 
     result = []
     for row in responses:
