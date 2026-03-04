@@ -183,8 +183,9 @@ def build_workbook(
 ) -> Workbook:
     """Build a DDI-adjacent xlsx workbook from parsed survey data.
 
-    This function is source-agnostic: a Limesurvey adapter can provide the
-    same inputs to produce an identical output format.
+    Source-agnostic: LimeSurvey and other adapters pass the same inputs.
+    *submissions* must be keyed by ``v["_data_key"]`` (``"group/name"`` or ``"name"``).
+    *source* is written to the ``survey_info`` sheet (e.g. ``"limesurvey"``).
     """
     variables = extract_variables(survey_rows, choices_by_list)
 

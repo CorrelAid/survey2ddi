@@ -1,24 +1,15 @@
-# kobo2ddi
+# survey2ddi
 
-Convert KoboToolbox survey data into DDI-compliant formats.
+Convert survey data from KoboToolbox or LimeSurvey into DDI-compliant formats.
 
-kobo2ddi pulls survey submissions and the corresponding XLSForm definition from the KoboToolbox API, transforms them into a structured xlsx codebook with separate sheets for variables, data, and study metadata, and generates a DDI-Codebook 2.5 XML file for standards-compliant documentation.
+Given a survey, survey2ddi outputs two files:
 
-## What it produces
+- **`<id>.xlsx`** — a human-readable workbook with three sheets:
+  - **variables** — codebook with variable name, group, question text, type, value labels, and measurement level
+  - **data** — one row per submission, one column per variable
+  - **survey_info** — study-level metadata (title, ID, version, language, source, submission count, export date)
 
-Given a KoboToolbox survey, kobo2ddi outputs two files:
-
-- **`<uid>.xlsx`** -- a human-readable workbook with three sheets:
-  - **variables** -- codebook with variable name, group, question text, type, coded value labels, and required flag
-  - **data** -- one row per submission, one column per variable, with only survey responses (no Kobo metadata)
-  - **survey_info** -- study-level metadata (title, ID, version, language, source, submission count, export date)
-
-- **`<uid>.xml`** -- a valid [DDI-Codebook 2.5](https://ddialliance.org/Specification/DDI-Codebook/2.5/) XML document containing:
-  - Study description (`stdyDscr`) with title, ID, version, and production date
-  - Variable groups (`varGrp`) matching the XLSForm sections
-  - Variable definitions (`var`) with labels, question text, category codes, and format types
-
-The XML validates against the official DDI-Codebook 2.5 XSD schema.
+- **`<id>.xml`** — a valid [DDI-Codebook 2.5](https://ddialliance.org/Specification/DDI-Codebook/2.5/) XML document
 
 ## Setup
 
@@ -28,71 +19,67 @@ Requires Python 3.13+. Install with [uv](https://docs.astral.sh/uv/):
 uv sync
 ```
 
-Create a `.env` file (see `.env.example`):
+Copy `.env.example` to `.env` and fill in your credentials (see the relevant section below).
+
+## KoboToolbox
+
+### Credentials
 
 ```
 KOBO_API_TOKEN=your_token_here
 KOBO_SERVER_URL=https://eu.kobotoolbox.org
 ```
 
-Get your API token from your KoboToolbox account under Account Settings > Security.
+Get your API token from KoboToolbox account settings under **Account Settings → Security**.
 
-## Usage
-
-### List available surveys
+### Usage
 
 ```
+# List available surveys
 uv run python -m kobo2ddi list
-```
 
-### Pull raw data (submissions + XLSForm)
-
-```
+# Download submissions + XLSForm
 uv run python -m kobo2ddi pull <uid>
-```
 
-Saves `submissions.json` and `form.xlsx` to `output/<uid>/`.
-
-### Transform into DDI formats
-
-```
+# Transform into DDI formats (pulls if not cached)
 uv run python -m kobo2ddi transform <uid>
 ```
 
-Pulls data if not already cached, then generates `<uid>.xlsx` and `<uid>.xml` in `output/<uid>/`. Use `--refresh` to re-download from the API.
+`pull` saves `submissions.json` and `form.xlsx` to `output/<uid>/`.
+`transform` generates `<uid>.xlsx` and `<uid>.xml` in the same directory. Use `--refresh` to re-download from the API.
 
-### As a Python library
+## LimeSurvey
 
-```python
-from kobo2ddi import KoboClient
-from kobo2ddi.transform import parse_xlsform, build_workbook
-from kobo2ddi.ddi_xml import build_ddi_xml
-
-client = KoboClient()
-asset = client.get_asset("your_uid")
-submissions = client.get_submissions("your_uid")
-client.download_xlsform("your_uid", Path("form.xlsx"))
-
-survey_rows, choices, settings = parse_xlsform(Path("form.xlsx"))
-workbook = build_workbook(asset["name"], survey_rows, choices, settings, submissions)
-xml_string = build_ddi_xml(asset["name"], survey_rows, choices, settings, submissions)
-```
-
-## Validating XML against the DDI schema
-
-To verify that a generated XML file is valid DDI-Codebook 2.5, use `xmllint` (pre-installed on macOS, available via `libxml2` on Linux):
+### Credentials
 
 ```
-xmllint --noout --schema tests/schemas/codebook.xsd output/<uid>/<uid>.xml
+LIME_SERVER_URL=https://your-limesurvey-instance.org
+LIME_USERNAME=your_username
+LIME_PASSWORD=your_password
 ```
 
-A successful result looks like:
+### Usage
 
 ```
-output/aoBaD9xB5fgsMV2Z8v3vuo/aoBaD9xB5fgsMV2Z8v3vuo.xml validates
+# List available surveys
+uv run python -m limesurvey2ddi list
+
+# Download responses
+uv run python -m limesurvey2ddi pull <survey_id>
+
+# Place the XLSForm export as output/<survey_id>/form.xlsx, then transform
+uv run python -m limesurvey2ddi transform <survey_id> --title "My Survey"
 ```
 
-The schema files in `tests/schemas/` are the official DDI-Codebook 2.5 XSD from the [DDI Alliance](https://ddialliance.org/Specification/DDI-Codebook/2.5/) (entry point: [codebook.xsd](https://ddialliance.org/hubfs/Specification/DDI-Codebook/2.5/XMLSchema/codebook.xsd)).
+`pull` saves `responses.json` to `output/<survey_id>/`. Unlike KoboToolbox, the XLSForm cannot be downloaded automatically — export it manually from LimeSurvey and place it as `output/<survey_id>/form.xlsx`.
+
+`transform` generates `<survey_id>.xlsx` and `<survey_id>.xml`. `--title` sets the study title in the output (defaults to the survey ID if omitted).
+
+You can also validate that `form.xlsx` and `responses.json` match before transforming:
+
+```
+uv run python -m limesurvey2ddi validate <survey_id>
+```
 
 ## Running tests
 
@@ -102,6 +89,40 @@ uv run python -m pytest tests/ -v
 
 Tests include XSD validation of generated XML against the official DDI-Codebook 2.5 schema (requires `xmllint`, auto-skipped if not available).
 
+## Validating XML manually
+
+```
+xmllint --noout --schema tests/schemas/codebook.xsd output/<id>/<id>.xml
+```
+
+The schema files in `tests/schemas/` are the official DDI-Codebook 2.5 XSD from the [DDI Alliance](https://ddialliance.org/Specification/DDI-Codebook/2.5/).
+
 ## Design
 
-The transform and DDI XML modules are source-agnostic -- they work with parsed survey data (rows, choices, settings) rather than Kobo-specific objects. This means the same output format can be reused for other survey platforms (e.g. Limesurvey) by writing a different adapter that produces the same inputs.
+The transform and DDI XML modules (`kobo2ddi/transform.py`, `kobo2ddi/ddi_xml.py`) are source-agnostic — they work with parsed XLSForm data rather than platform-specific objects. The LimeSurvey adapter (`limesurvey2ddi/transform.py`) normalises LimeSurvey's export quirks (underscore stripping, `select_multiple` sub-columns) before passing data to the same core functions.
+
+### As a Python library
+
+```python
+# KoboToolbox
+from kobo2ddi import KoboClient
+from kobo2ddi.transform import parse_xlsform, build_workbook
+from kobo2ddi.ddi_xml import build_ddi_xml
+
+client = KoboClient()
+asset = client.get_asset("your_uid")
+submissions = client.get_submissions("your_uid")
+client.download_xlsform("your_uid", Path("form.xlsx"))
+survey_rows, choices, settings = parse_xlsform(Path("form.xlsx"))
+workbook = build_workbook(asset["name"], survey_rows, choices, settings, submissions)
+xml_string = build_ddi_xml(asset["name"], survey_rows, choices, settings, submissions)
+
+# LimeSurvey
+from limesurvey2ddi import LimeSurveyClient
+from limesurvey2ddi.transform import build_workbook, build_ddi_xml
+
+client = LimeSurveyClient()
+responses = client.get_responses(322836)
+workbook = build_workbook("My Survey", Path("form.xlsx"), responses)
+xml_string = build_ddi_xml("My Survey", Path("form.xlsx"), responses)
+```
