@@ -1,7 +1,7 @@
 [project]
-name = "kobo2ddi"
+name = "survey2ddi"
 version = "0.1.0"
-description = "Transform KoboToolbox survey data into a DDI-adjacent format"
+description = "Transform survey data (KoboToolbox, LimeSurvey) into DDI-adjacent formats"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -15,6 +15,9 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["kobo2ddi", "limesurvey2ddi"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
@@ -22,3 +25,4 @@ dev = [
 
 [project.scripts]
 kobo2ddi = "kobo2ddi.cli:main"
+limesurvey2ddi = "limesurvey2ddi.cli:main"
