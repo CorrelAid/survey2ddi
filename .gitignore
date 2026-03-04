@@ -13,3 +13,4 @@ wheels/
 output
 
 .DS_Store
+.coverage
