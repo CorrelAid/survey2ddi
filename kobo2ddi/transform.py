@@ -179,6 +179,7 @@ def build_workbook(
     choices_by_list: dict[str, list[dict]],
     settings: dict,
     submissions: list[dict],
+    source: str = "kobotoolbox",
 ) -> Workbook:
     """Build a DDI-adjacent xlsx workbook from parsed survey data.
 
@@ -214,7 +215,7 @@ def build_workbook(
         ("id", settings.get("id_string", "")),
         ("version", settings.get("version", "")),
         ("language", settings.get("default_language", "")),
-        ("source", "kobotoolbox"),
+        ("source", source),
         ("submission_count", len(submissions)),
         ("export_date", date.today().isoformat()),
     ]
