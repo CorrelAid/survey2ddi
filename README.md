@@ -39,14 +39,16 @@ Get your API token from KoboToolbox account settings under **Account Settings â†
 uv run python -m kobo2ddi list
 
 # Download submissions + XLSForm
-uv run python -m kobo2ddi pull <uid>
+uv run python -m kobo2ddi pull <asset_uid>
 
 # Transform into DDI formats (pulls if not cached)
-uv run python -m kobo2ddi transform <uid>
+uv run python -m kobo2ddi transform <asset_uid>
 ```
 
-`pull` saves `submissions.json` and `form.xlsx` to `output/<uid>/`.
-`transform` generates `<uid>.xlsx` and `<uid>.xml` in the same directory. Use `--refresh` to re-download from the API.
+The asset UID is an 11-character alphanumeric string (e.g. `aXkQm3nBpL9`) visible in the KoboToolbox URL and in the output of `list`.
+
+`pull` saves `submissions.json` and `form.xlsx` to `output/<asset_uid>/`.
+`transform` generates `<asset_uid>.xlsx` and `<asset_uid>.xml` in the same directory. Use `--refresh` to re-download from the API.
 
 ## LimeSurvey
 
@@ -70,6 +72,8 @@ uv run python -m limesurvey2ddi pull <survey_id>
 # Place the XLSForm export as output/<survey_id>/form.xlsx, then transform
 uv run python -m limesurvey2ddi transform <survey_id> --title "My Survey"
 ```
+
+The survey ID is a numeric integer (e.g. `322836`) shown in the LimeSurvey admin URL and in the output of `list`.
 
 `pull` saves `responses.json` to `output/<survey_id>/`. Unlike KoboToolbox, the XLSForm cannot be downloaded automatically â€” export it manually from LimeSurvey and place it as `output/<survey_id>/form.xlsx`.
 
@@ -118,9 +122,9 @@ from kobo2ddi.transform import parse_xlsform, build_workbook
 from kobo2ddi.ddi_xml import build_ddi_xml
 
 client = KoboClient()
-asset = client.get_asset("your_uid")
-submissions = client.get_submissions("your_uid")
-client.download_xlsform("your_uid", Path("form.xlsx"))
+asset = client.get_asset("your_asset_uid")
+submissions = client.get_submissions("your_asset_uid")
+client.download_xlsform("your_asset_uid", Path("form.xlsx"))
 survey_rows, choices, settings = parse_xlsform(Path("form.xlsx"))
 workbook = build_workbook(asset["name"], survey_rows, choices, settings, submissions)
 xml_string = build_ddi_xml(asset["name"], survey_rows, choices, settings, submissions)
