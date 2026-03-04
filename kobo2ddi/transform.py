@@ -11,6 +11,9 @@ SKIP_TYPES = {
     "begin_group", "end_group", "begin_repeat", "end_repeat",
     "note", "start", "end", "today", "deviceid", "phonenumber",
     "username", "audit",
+    # Repeat groups are skipped entirely — variables inside begin_repeat/end_repeat
+    # blocks are silently excluded.  KoboToolbox stores repeat data as nested
+    # arrays; supporting them requires a different data model.
     # Unsupported for now
     "geopoint", "geotrace", "geoshape",
     "image", "audio", "video", "file", "barcode",
@@ -84,7 +87,12 @@ def parse_xlsform(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
 
 
 def _find_label_col(header_sets: list) -> str:
-    """Return the best label column name (prefer ``label::*``, fall back to ``label``)."""
+    """Return the best label column name (prefer ``label::*``, fall back to ``label``).
+
+    Limitation: for multi-language forms only the *first* ``label::*`` column is
+    used.  There is currently no way to select a specific language.  If this
+    matters, ensure the desired language column appears first in the XLSForm.
+    """
     if not header_sets:
         return "label"
     headers = list(header_sets[0])
