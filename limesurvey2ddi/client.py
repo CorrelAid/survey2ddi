@@ -10,6 +10,7 @@ import httpx
 from dotenv import load_dotenv
 
 from kobo2ddi.transform import extract_variables, parse_xlsform
+from limesurvey2ddi.transform import _norm
 
 load_dotenv()
 
@@ -170,10 +171,7 @@ class LimeSurveyClient:
                 response_base_names.add(key)
 
         # LimeSurvey strips underscores from question codes on export.
-        # Normalize both sides by removing underscores for matching.
-        def _norm(name: str) -> str:
-            return name.replace("_", "").lower()
-
+        # _norm() from limesurvey2ddi.transform normalises both sides for matching.
         norm_form = {_norm(n): n for n in form_names}
         norm_response = {_norm(n): n for n in response_base_names}
 

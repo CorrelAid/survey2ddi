@@ -43,9 +43,6 @@ def normalize_responses(
                 return code
         return subkey  # fall back to the raw subkey
 
-    # Build lookup: normalised name → variable dict
-    norm_to_var = {_norm(v["name"]): v for v in variables}
-
     result = []
     for row in responses:
         # Separate simple columns from select_multiple sub-columns
