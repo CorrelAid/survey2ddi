@@ -190,6 +190,22 @@ class TestGetResponses:
         ):
             assert client.get_responses(12345) == []
 
+    def test_non_dict_items_skipped(self, client):
+        """Non-dict entries in responses array are silently skipped (line 116)."""
+        rows = [
+            {"id": "1", "q1": "a"},
+            "unexpected_string",   # non-dict — should be ignored
+            {"id": "2", "q1": "b"},
+        ]
+        with patch.object(
+            client._http, "post",
+            return_value=_rpc_response(_b64_responses(rows)),
+        ):
+            result = client.get_responses(12345)
+        assert len(result) == 2
+        assert result[0]["q1"] == "a"
+        assert result[1]["q1"] == "b"
+
     def test_response_keys_preserved(self, client):
         """Response dict keys (including metadata) are preserved as-is."""
         rows = [{"id": "1", "submitdate": "2025-01-01", "haeufigkeit": "often"}]

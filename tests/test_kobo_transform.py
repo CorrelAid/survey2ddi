@@ -107,6 +107,28 @@ class TestExtractVariables:
         ]
         assert extract_variables(rows, {}) == []
 
+    def test_blank_type_row_skipped(self):
+        """Rows with an empty/None type are silently skipped (line 126)."""
+        rows = [
+            {"type": "", "name": "phantom", "label": "Ghost"},
+            {"type": "text", "name": "real", "label": "Real"},
+        ]
+        variables = extract_variables(rows, {})
+        names = [v["name"] for v in variables]
+        assert "phantom" not in names
+        assert "real" in names
+
+    def test_blank_name_row_skipped(self):
+        """Rows with an empty/None name are silently skipped (line 142)."""
+        rows = [
+            {"type": "text", "name": "", "label": "No name"},
+            {"type": "text", "name": "named", "label": "Named"},
+        ]
+        variables = extract_variables(rows, {})
+        names = [v["name"] for v in variables]
+        assert "" not in names
+        assert "named" in names
+
 
 # -- parse_xlsform -----------------------------------------------------------
 
@@ -131,6 +153,42 @@ class TestParseXlsform:
         assert settings["id_string"] == "test_survey_2025"
         assert settings["version"] == "1.0"
         assert settings["default_language"] == "English"
+
+    def test_missing_choices_sheet_returns_empty(self, tmp_path):
+        """XLSForm without a 'choices' sheet → choices_by_list is empty (line 59)."""
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "survey"
+        ws.append(["type", "name", "label"])
+        ws.append(["text", "q1", "Q1"])
+        # no 'choices' sheet
+        ws_s = wb.create_sheet("settings")
+        ws_s.append(["id_string"])
+        ws_s.append(["x"])
+        path = tmp_path / "form.xlsx"
+        wb.save(path)
+        _, choices, _ = parse_xlsform(path)
+        assert choices == {}
+
+    def test_choices_row_without_list_name_skipped(self, tmp_path):
+        """Choices row with blank list_name is silently skipped (line 78)."""
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "survey"
+        ws.append(["type", "name", "label"])
+        ws_c = wb.create_sheet("choices")
+        ws_c.append(["list_name", "name", "label"])
+        ws_c.append([None, "orphan", "Orphan choice"])   # blank list_name
+        ws_c.append(["real_list", "a", "Option A"])
+        wb.create_sheet("settings")
+        path = tmp_path / "form.xlsx"
+        wb.save(path)
+        _, choices, _ = parse_xlsform(path)
+        assert "real_list" in choices
+        assert None not in choices
+        assert "" not in choices
 
     def test_handles_label_with_language_suffix(self, xlsform_path):
         """The fixture uses label::English — verify it's picked up correctly."""
