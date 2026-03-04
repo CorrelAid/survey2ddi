@@ -1,4 +1,4 @@
-"""Tests for kobo2ddi.cli — CLI argument parsing and command dispatch."""
+"""Tests for kobo2ddi.cli — KoboToolbox CLI argument parsing and command dispatch."""
 
 import json
 from pathlib import Path
