@@ -1,3 +1,5 @@
+This repository is part of the Civic Data Lab's Survey Toolbox (ToDo: Link). In the Toolbox you'll find information and guidance on everything related to surveys — from design to analysis.
+
 # survey2ddi
 
 Convert survey data from KoboToolbox or LimeSurvey into DDI-compliant formats.
@@ -138,3 +140,10 @@ responses = client.get_responses(322836)
 workbook = build_workbook("My Survey", Path("form.xlsx"), responses)
 xml_string = build_ddi_xml("My Survey", Path("form.xlsx"), responses)
 ```
+
+
+## AI Disclaimer
+In creating this repository, language models were used for the following tasks:
+- Sparring
+- Developing code
+- Writing technical documentation
