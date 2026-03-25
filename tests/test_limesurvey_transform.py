@@ -320,18 +320,34 @@ class TestLimeBuildDdiXml:
         xml = build_ddi_xml("T", lime_form_path, lime_responses)
         root = fromstring(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        assert len(variables) == len(LIME_SURVEY_ROWS)
+        # 4 non-select_multiple + 4 binary vars (bereiche expanded) = 8
+        assert len(variables) == 8
 
-    def test_select_multiple_has_categories(self, lime_form_path, lime_responses):
+    def test_select_multiple_expanded_to_binary_vars(self, lime_form_path, lime_responses):
         xml = build_ddi_xml("T", lime_form_path, lime_responses)
         root = fromstring(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
         by_name = {v.get("name"): v for v in variables}
-        catgries = by_name["bereiche"].findall("ddi:catgry", NS)
-        assert len(catgries) == 4
+        # Original single var should not exist
+        assert "bereiche" not in by_name
+        # Binary vars should exist
+        assert "bereiche_holz" in by_name
+        assert "bereiche_metall" in by_name
+        assert "bereiche_textil" in by_name
+        assert "bereiche_digital" in by_name
+        # Each binary var has 0/1 categories
+        catgries = by_name["bereiche_holz"].findall("ddi:catgry", NS)
+        assert len(catgries) == 2
         vals = [c.find("ddi:catValu", NS).text for c in catgries]
-        assert "holz" in vals
-        assert "metall" in vals
+        assert vals == ["0", "1"]
+
+    def test_select_multiple_has_multipleResp_group(self, lime_form_path, lime_responses):
+        xml = build_ddi_xml("T", lime_form_path, lime_responses)
+        root = fromstring(xml)
+        grps = root.findall(".//ddi:dataDscr/ddi:varGrp", NS)
+        bereiche_grp = [g for g in grps if g.get("name") == "bereiche"]
+        assert len(bereiche_grp) == 1
+        assert bereiche_grp[0].get("type") == "multipleResp"
 
     @pytest.mark.skipif(
         subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,

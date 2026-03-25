@@ -123,3 +123,33 @@ def xlsform_path(tmp_path):
     path = tmp_path / "form.xlsx"
     wb.save(path)
     return path
+
+
+# -- Grid group test data (for DDI XML grid/matrix tests) --
+
+GRID_SURVEY_ROWS = [
+    {"type": "begin_group", "name": "trust", "label": "Trust in institutions", "required": "false", "appearance": "table-list"},
+    {"type": "select_one skala5", "name": "trust_parliament", "label": "Parliament", "required": "false", "appearance": None},
+    {"type": "select_one skala5", "name": "trust_police", "label": "Police", "required": "false", "appearance": None},
+    {"type": "end_group", "name": None, "label": None, "required": None, "appearance": None},
+]
+
+GRID_CHOICES = {
+    "skala5": [
+        {"name": "1", "label": "Not at all"},
+        {"name": "2", "label": "2"},
+        {"name": "3", "label": "3"},
+        {"name": "4", "label": "4"},
+        {"name": "5", "label": "Completely"},
+    ],
+}
+
+
+@pytest.fixture
+def grid_survey_rows():
+    return GRID_SURVEY_ROWS
+
+
+@pytest.fixture
+def grid_choices():
+    return GRID_CHOICES
