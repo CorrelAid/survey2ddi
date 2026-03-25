@@ -119,6 +119,8 @@ def extract_variables(
 
     variables: list[dict] = []
     group_stack: list[str] = []
+    # Track group metadata: name → {label, appearance}
+    group_meta: dict[str, dict] = {}
 
     for row in survey_rows:
         raw_type = str(row.get("type") or "").strip()
@@ -128,7 +130,12 @@ def extract_variables(
         base_type = raw_type.split()[0]
 
         if base_type == "begin_group":
-            group_stack.append(str(row.get("name", "")))
+            gname = str(row.get("name", ""))
+            group_stack.append(gname)
+            group_meta[gname] = {
+                "label": str(row.get(label_col, "") or ""),
+                "appearance": str(row.get("appearance", "") or "").lower(),
+            }
             continue
         if base_type == "end_group":
             if group_stack:
@@ -164,9 +171,15 @@ def extract_variables(
             if "likert" in (list_name or "").lower() or "likert" in appearance:
                 measure = "ordinal"
 
+        # Resolve immediate group metadata (innermost group)
+        cur_group = group_stack[-1] if group_stack else ""
+        gm = group_meta.get(cur_group, {})
+
         variables.append({
             "name": name,
             "group": group,
+            "group_label": gm.get("label", ""),
+            "group_appearance": gm.get("appearance", ""),
             "label": str(row.get(label_col, "") or ""),
             "type": std_type,
             "measure": measure,
