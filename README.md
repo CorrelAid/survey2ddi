@@ -14,7 +14,7 @@ Given a survey, survey2ddi outputs two files:
   - **data** — one row per submission, one column per variable
   - **survey_info** — study-level metadata (title, ID, version, language, source, submission count, export date)
 
-- **`<id>.xml`** — a valid [DDI-Codebook 2.5](https://ddialliance.org/Specification/DDI-Codebook/2.5/) XML document
+- **`<id>.xml`** — a valid [DDI-Codebook 2.5](https://ddialliance.org/Specification/DDI-Codebook/2.5/) XML document, compatible with [qwacback](https://github.com/CorrelAid/qwacback)'s XSD + Schematron validation. `select_multiple` questions are expanded into binary variables in the XML (one per choice); the xlsx is unaffected.
 
 ## Setup
 
@@ -111,6 +111,8 @@ The schema files in `tests/schemas/` are the official DDI-Codebook 2.5 XSD from 
 **Multi-language forms:** Only the first `label::*` column in the XLSForm is used. For bilingual forms, place the preferred language column first.
 
 **Repeat groups:** Variables inside `begin_repeat`/`end_repeat` blocks are silently skipped. KoboToolbox stores repeat data as nested arrays which require a different data model; this is not currently supported.
+
+**Plain groups in DDI XML:** `begin_group`/`end_group` blocks without `appearance="table-list"` are not emitted as `<varGrp>` in the XML — their variables appear as standalone `<var>` elements. Groups with `appearance="table-list"` become `<varGrp type="grid">`.
 
 **LimeSurvey `select_multiple` bracket keys:** LimeSurvey truncates option codes to 5 characters in its export (e.g. `metall` → `metal`). The transform recovers the original code via prefix matching. This fails if two choice codes share the same first 5 characters — a `ValueError` is raised in that case. It also fails silently (with a warning) if LimeSurvey uses internal answer codes that have no relation to the XLSForm choice names; this can happen for surveys not originally created from an XLSForm.
 
