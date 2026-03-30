@@ -1,4 +1,7 @@
-This repository is part of the Civic Data Lab's Survey Toolbox (ToDo: Link). In the Toolbox you'll find information and guidance on everything related to surveys — from design to analysis.
+[![AI-Assisted](https://img.shields.io/badge/AI--assisted-Claude%20Code-blueviolet?logo=anthropic&logoColor=white)](./AI_DISCLOSURE.md)
+
+
+This repository is part of the Civic Data Lab's [Survey Toolbox](https://umfragen.civic-data.de/). In the Toolbox you'll find information and guidance on everything related to surveys — from design to analysis.
 
 # survey2ddi
 
@@ -141,9 +144,3 @@ workbook = build_workbook("My Survey", Path("form.xlsx"), responses)
 xml_string = build_ddi_xml("My Survey", Path("form.xlsx"), responses)
 ```
 
-
-## AI Disclaimer
-In creating this repository, language models were used for the following tasks:
-- Sparring
-- Developing code
-- Writing technical documentation
