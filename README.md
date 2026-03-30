@@ -7,6 +7,8 @@ This repository is part of the Civic Data Lab's [Survey Toolbox](https://umfrage
 
 Convert survey data from KoboToolbox or LimeSurvey into DDI-compliant formats.
 
+Survey tools like KoboToolbox and LimeSurvey are great for collecting data, but their raw exports are often cryptic — coded values without labels, flattened group structures, and little context about what was actually measured. Months or years later, it can be hard to make sense of your own data. survey2ddi solves this by combining your survey structure and responses into a self-documenting codebook workbook and a standardized DDI-Codebook 2.5 XML file. The XML is specifically designed for import into [qwacback](https://github.com/CorrelAid/qwacback), a shared question bank that allows to reuse, compare, and build on each other's best survey questions across studies.
+
 Given a survey, survey2ddi outputs two files:
 
 - **`<id>.xlsx`** — a human-readable workbook with three sheets:
