@@ -168,18 +168,14 @@ class TestIntrvl:
 
 
 class TestNatureAttribute:
-    """nature attribute is kept (not forbidden by Schematron)."""
+    """``nature`` is deliberately omitted — qwacback's converter never emits it."""
 
-    def test_nature_present(self, survey_rows, choices_by_list, settings, submissions):
+    def test_nature_absent(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
         by_name = _vars_by_name(root)
-        assert by_name["age"].get("nature") == "ratio"
-        assert by_name["gender"].get("nature") == "nominal"
-        assert by_name["satisfaction"].get("nature") == "ordinal"
-        assert by_name["visit_date"].get("nature") == "interval"
-        assert by_name["full_name"].get("nature") is None
-        assert by_name["calc_field"].get("nature") is None
+        for var in by_name.values():
+            assert var.get("nature") is None
 
 
 class TestIdFormat:
@@ -298,11 +294,11 @@ class TestSelectMultipleExpansion:
         assert "hobbies" not in by_name
 
     def test_total_variable_count(self, survey_rows, choices_by_list, settings, submissions):
-        """8 standalone + 3 binary (hobbies expanded) = 11 vars."""
+        """9 standalone (inc. `thanks` note) + 3 binary (hobbies expanded) = 12 vars."""
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        assert len(variables) == 11
+        assert len(variables) == 12
 
 
 class TestGridGroup:
@@ -318,6 +314,7 @@ class TestGridGroup:
         assert grp.get("name") == "trust"
 
     def test_grid_group_has_concept_and_txt(self, grid_survey_rows, grid_choices, settings, submissions):
+        """Grid group emits both <concept> and <txt> with the group label."""
         xml = build_ddi_xml("Test", grid_survey_rows, grid_choices, settings, [])
         root = _parse(xml)
         grp = root.findall(".//ddi:dataDscr/ddi:varGrp", NS)[0]
@@ -325,6 +322,7 @@ class TestGridGroup:
         assert grp.find("ddi:txt", NS).text == "Trust in institutions"
 
     def test_grid_members_have_preQTxt(self, grid_survey_rows, grid_choices, settings, submissions):
+        """Each grid member var carries <preQTxt> = group label."""
         xml = build_ddi_xml("Test", grid_survey_rows, grid_choices, settings, [])
         root = _parse(xml)
         by_name = _vars_by_name(root)

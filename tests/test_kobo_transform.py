@@ -17,8 +17,8 @@ class TestExtractVariables:
         assert "age" in names
         assert "gender" in names
         assert "satisfaction" in names
-        # non-data types excluded
-        assert "thanks" not in names  # note
+        assert "thanks" in names  # note vars are emitted (matches qwacback)
+        # structural rows excluded
         assert "demo" not in names  # begin_group name
 
     def test_group_tracking(self, survey_rows, choices_by_list):
@@ -99,13 +99,21 @@ class TestExtractVariables:
         assert extract_variables([], {}) == []
 
     def test_skipped_types_not_included(self):
+        """Metadata/geo/media types are filtered out; note is intentionally kept."""
         rows = [
-            {"type": "note", "name": "n1", "label": "Note"},
             {"type": "geopoint", "name": "loc", "label": "Location"},
             {"type": "image", "name": "photo", "label": "Photo"},
             {"type": "start", "name": "start", "label": "Start"},
         ]
         assert extract_variables(rows, {}) == []
+
+    def test_note_type_retained(self):
+        """note vars are emitted as text vars — matches qwacback's converter."""
+        rows = [{"type": "note", "name": "thanks", "label": "Thank you"}]
+        variables = extract_variables(rows, {})
+        assert len(variables) == 1
+        assert variables[0]["name"] == "thanks"
+        assert variables[0]["type"] == "note"
 
     def test_blank_type_row_skipped(self):
         """Rows with an empty/None type are silently skipped (line 126)."""
@@ -218,8 +226,8 @@ class TestBuildWorkbook:
     def test_variables_sheet_row_count(self, survey_rows, choices_by_list, settings, submissions):
         wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
         ws = wb["variables"]
-        # header + 9 data-carrying variables
-        assert ws.max_row == 10
+        # header + 10 data-carrying variables (9 + `thanks` note)
+        assert ws.max_row == 11
 
     def test_data_sheet_columns_match_variables(self, survey_rows, choices_by_list, settings, submissions):
         wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)

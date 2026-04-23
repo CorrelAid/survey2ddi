@@ -6,10 +6,12 @@ from pathlib import Path
 import openpyxl
 from openpyxl import Workbook
 
-# Types that don't carry respondent data
+# Types that don't carry respondent data (skipped entirely during extraction).
+# NOTE: `note` is intentionally NOT skipped — qwacback emits it as a text var
+# and we mirror that so output is interchangeable with qwacback's converter.
 SKIP_TYPES = {
     "begin_group", "end_group", "begin_repeat", "end_repeat",
-    "note", "start", "end", "today", "deviceid", "phonenumber",
+    "start", "end", "today", "deviceid", "phonenumber",
     "username", "audit",
     # Repeat groups are skipped entirely — variables inside begin_repeat/end_repeat
     # blocks are silently excluded.  KoboToolbox stores repeat data as nested
@@ -22,6 +24,7 @@ SKIP_TYPES = {
 # XLSForm type → standardized type
 TYPE_MAP = {
     "text": "string",
+    "note": "note",
     "integer": "integer",
     "decimal": "decimal",
     "date": "date",
@@ -148,12 +151,22 @@ def extract_variables(
         if not name:
             continue
 
-        # Determine standardized type and optional list name
+        # Determine standardized type and optional list name / vocab
         list_name = None
+        vocab = ""
         if base_type in ("select_one", "select_multiple", "rank"):
             parts = raw_type.split(maxsplit=1)
             std_type = base_type
             list_name = parts[1] if len(parts) > 1 else None
+        elif base_type in ("select_one_from_file", "select_multiple_from_file"):
+            # Second token is the CSV filename; the vocab is the filename stem.
+            parts = raw_type.split(maxsplit=1)
+            std_type = base_type
+            filename = parts[1] if len(parts) > 1 else ""
+            if filename.lower().endswith(".csv"):
+                vocab = filename[: -len(".csv")]
+            else:
+                vocab = filename
         else:
             std_type = TYPE_MAP.get(base_type, base_type)
 
@@ -184,6 +197,7 @@ def extract_variables(
             "type": std_type,
             "measure": measure,
             "list_name": list_name or "",
+            "vocab": vocab,
             "choices": choices,
             "values": values_str,
             "required": str(row.get("required", "false") or "false").lower(),
