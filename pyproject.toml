@@ -24,6 +24,12 @@ dev = [
     "pytest-cov>=7.0.0",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires docker + qwacback/schematron-worker images (opt-in)",
+]
+addopts = "-m 'not integration'"
+
 [project.scripts]
 kobo2ddi = "kobo2ddi.cli:main"
 limesurvey2ddi = "limesurvey2ddi.cli:main"

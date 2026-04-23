@@ -100,6 +100,25 @@ uv run python -m pytest tests/ -v
 
 Tests include XSD validation of generated XML against the official DDI-Codebook 2.5 schema (requires `xmllint`, auto-skipped if not available).
 
+### Integration tests (Schematron)
+
+Schematron rules go beyond the XSD (uniqueness of IDs, consistency between variable groups and their members, `_other` conventions, etc.). They live in [qwacback](https://github.com/CorrelAid/qwacback) and are checked by a Java worker exposed behind `POST /api/validate`. The integration suite boots that stack via docker compose and posts generated XML to it.
+
+```
+uv run python -m pytest tests/integration -m integration
+```
+
+Requires Docker. The session fixture pulls `ghcr.io/correlaid/qwacback{,-schematron-worker}:latest`, waits for readiness, then tears the stack down. Cold start is ~20-30s; subsequent tests in the same session are ~1s.
+
+To iterate faster, keep the stack up and point tests at it:
+
+```
+docker compose -f tests/integration/docker-compose.validate.yml up -d --wait
+S2D_VALIDATE_URL=http://127.0.0.1:8090 uv run python -m pytest tests/integration -m integration
+```
+
+Pin to a specific qwacback build with `QWACBACK_TAG=sha-abc1234` (or a semver like `0.1.0`). Change `PB_PORT` if 8090 is taken.
+
 ## Validating XML manually
 
 ```
@@ -126,7 +145,7 @@ The transform and DDI XML modules (`kobo2ddi/transform.py`, `kobo2ddi/ddi_xml.py
 
 ```python
 # KoboToolbox
-from kobo2ddi import KoboClient
+from kobo2ddi.client import KoboClient
 from kobo2ddi.transform import parse_xlsform, build_workbook
 from kobo2ddi.ddi_xml import build_ddi_xml
 
@@ -139,7 +158,7 @@ workbook = build_workbook(asset["name"], survey_rows, choices, settings, submiss
 xml_string = build_ddi_xml(asset["name"], survey_rows, choices, settings, submissions)
 
 # LimeSurvey
-from limesurvey2ddi import LimeSurveyClient
+from limesurvey2ddi.client import LimeSurveyClient
 from limesurvey2ddi.transform import build_workbook, build_ddi_xml
 
 client = LimeSurveyClient()
