@@ -7,12 +7,7 @@ import sys
 from pathlib import Path
 
 from limesurvey2ddi.client import LimeSurveyClient
-from limesurvey2ddi.transform import (
-    build_data_csv,
-    build_data_csv_from_lstsv,
-    build_ddi_xml,
-    build_ddi_xml_from_lstsv,
-)
+from limesurvey2ddi.transform import build_data_csv, build_ddi_xml
 
 
 def cmd_list(make_client, _args: argparse.Namespace) -> None:
@@ -54,39 +49,21 @@ def cmd_transform(_make_client, args: argparse.Namespace) -> None:
             sys.exit(1)
         responses = json.loads(responses_path.read_text())
 
-    # Determine schema source
-    schema_path = None
-    if args.schema:
-        schema_path = Path(args.schema)
-    else:
-        # Default fallback chain
-        xlsx_path = survey_dir / "form.xlsx"
-        tsv_path = survey_dir / "survey.tsv"
-        if xlsx_path.exists():
-            schema_path = xlsx_path
-        elif tsv_path.exists():
-            schema_path = tsv_path
+    schema_path = Path(args.schema) if args.schema else survey_dir / "survey.tsv"
 
-    if not schema_path or not schema_path.exists():
+    if not schema_path.exists():
         print(
-            f"Error: No schema found in {survey_dir}. "
-            "Place form.xlsx or survey.tsv there, or use --schema."
+            f"Error: survey-structure TSV not found at {schema_path}. "
+            "Place survey.tsv there, or pass --schema."
         )
         sys.exit(1)
 
     title = args.title or str(survey_id)
 
-    if schema_path.suffix.lower() == ".tsv":
-        xml_str = build_ddi_xml_from_lstsv(
-            title, schema_path, responses, dataset_filename=f"{survey_id}.csv"
-        )
-        csv_str = build_data_csv_from_lstsv(schema_path, responses)
-    else:
-        # Assume XLSX
-        xml_str = build_ddi_xml(
-            title, schema_path, responses, dataset_filename=f"{survey_id}.csv"
-        )
-        csv_str = build_data_csv(schema_path, responses)
+    xml_str = build_ddi_xml(
+        title, schema_path, responses, dataset_filename=f"{survey_id}.csv"
+    )
+    csv_str = build_data_csv(schema_path, responses)
 
     xml_path = survey_dir / f"{survey_id}.xml"
     xml_path.write_text(xml_str, encoding="utf-8")
@@ -97,11 +74,18 @@ def cmd_transform(_make_client, args: argparse.Namespace) -> None:
     print(f"Wrote {csv_path}")
 
 
-def cmd_validate(make_client, args: argparse.Namespace) -> None:
-    output_dir = Path(args.output) if args.output else None
-    ok = make_client().validate(int(args.survey_id), output_dir=output_dir)
-    if not ok:
+def cmd_metadata(_make_client, args: argparse.Namespace) -> None:
+    schema_path = Path(args.schema)
+    if not schema_path.exists():
+        print(f"Error: {schema_path} not found.")
         sys.exit(1)
+
+    title = args.title or schema_path.stem
+    xml_str = build_ddi_xml(title, schema_path, [])
+
+    out_path = Path(args.output) if args.output else schema_path.with_suffix(".xml")
+    out_path.write_text(xml_str, encoding="utf-8")
+    print(f"Wrote {out_path}")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -120,20 +104,24 @@ def main(argv: list[str] | None = None) -> None:
     pull_p.add_argument("survey_id", help="Numeric survey ID")
     pull_p.add_argument("-o", "--output", help="Output directory (default: ./output)")
 
-    val_p = sub.add_parser("validate", help="Check form.xlsx matches responses.json")
-    val_p.add_argument("survey_id", help="Numeric survey ID")
-    val_p.add_argument("-o", "--output", help="Output directory (default: ./output)")
-
     transform_p = sub.add_parser("transform", help="Transform into DDI XML + CSV")
     transform_p.add_argument("survey_id", help="Numeric survey ID")
     transform_p.add_argument("--title", help="Survey title (default: survey ID)")
     transform_p.add_argument(
-        "--schema", help="Path to schema file (form.xlsx or survey.tsv)"
+        "--schema", help="Path to LimeSurvey survey-structure TSV (default: <output>/<id>/survey.tsv)"
     )
     transform_p.add_argument(
         "--data", help="Path to raw LimeSurvey CSV export (must use question codes)"
     )
     transform_p.add_argument("-o", "--output", help="Output directory (default: ./output)")
+
+    meta_p = sub.add_parser(
+        "metadata",
+        help="Emit DDI XML from a schema only (no responses, no API call)",
+    )
+    meta_p.add_argument("schema", help="Path to LimeSurvey survey-structure TSV")
+    meta_p.add_argument("--title", help="Survey title (default: schema filename stem)")
+    meta_p.add_argument("-o", "--output", help="Output XML path (default: <schema>.xml)")
 
     args = parser.parse_args(argv)
     if not args.command:
@@ -156,8 +144,8 @@ def main(argv: list[str] | None = None) -> None:
     commands = {
         "list": cmd_list,
         "pull": cmd_pull,
-        "validate": cmd_validate,
         "transform": cmd_transform,
+        "metadata": cmd_metadata,
     }
     commands[args.command](make_client, args)
 

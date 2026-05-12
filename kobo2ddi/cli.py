@@ -81,6 +81,28 @@ def cmd_transform(make_client, args: argparse.Namespace) -> None:
     print(f"Wrote {csv_path}")
 
 
+def cmd_metadata(_make_client, args: argparse.Namespace) -> None:
+    form_path = Path(args.form)
+    if not form_path.exists():
+        print(f"Error: {form_path} not found.")
+        sys.exit(1)
+
+    survey_rows, choices_by_list, settings = parse_xlsform(form_path)
+    title = args.title or form_path.stem
+
+    xml_str = build_ddi_xml(
+        title,
+        survey_rows,
+        choices_by_list,
+        settings,
+        [],
+    )
+
+    out_path = Path(args.output) if args.output else form_path.with_suffix(".xml")
+    out_path.write_text(xml_str, encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="kobo2ddi", description="KoboToolbox → DDI")
     parser.add_argument("--token", help="API token (overrides KOBO_API_TOKEN env var)")
@@ -111,6 +133,14 @@ def main(argv: list[str] | None = None) -> None:
         help="Path to raw Kobo CSV export (must use XML values and headers)",
     )
 
+    meta_p = sub.add_parser(
+        "metadata",
+        help="Emit DDI XML from an XLSForm only (no responses, no API call)",
+    )
+    meta_p.add_argument("form", help="Path to form.xlsx")
+    meta_p.add_argument("--title", help="Survey title (default: form filename stem)")
+    meta_p.add_argument("-o", "--output", help="Output XML path (default: <form>.xml)")
+
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
@@ -125,7 +155,12 @@ def main(argv: list[str] | None = None) -> None:
             )
         return cached_client[0]
 
-    commands = {"list": cmd_list, "pull": cmd_pull, "transform": cmd_transform}
+    commands = {
+        "list": cmd_list,
+        "pull": cmd_pull,
+        "transform": cmd_transform,
+        "metadata": cmd_metadata,
+    }
     commands[args.command](make_client, args)
 
 

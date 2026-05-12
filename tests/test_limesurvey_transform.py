@@ -1,18 +1,9 @@
-"""Tests for limesurvey2ddi.transform — response normalisation and DDI output."""
-
-import subprocess
-from datetime import date
-from pathlib import Path
-from xml.etree.ElementTree import fromstring
+"""Tests for limesurvey2ddi.transform — response normalisation."""
 
 import pytest
-from openpyxl import Workbook
 
 from kobo2ddi.transform import extract_variables
-from limesurvey2ddi.transform import build_ddi_xml, normalize_responses
-
-NS = {"ddi": "ddi:codebook:2_5"}
-SCHEMA_PATH = Path(__file__).parent / "schemas" / "codebook.xsd"
+from limesurvey2ddi.transform import normalize_responses
 
 # ---------------------------------------------------------------------------
 # Fixtures — a minimal LimeSurvey-style survey
@@ -77,31 +68,6 @@ def lime_variables():
 @pytest.fixture
 def lime_responses():
     return [LIME_RESPONSE_ROW]
-
-
-@pytest.fixture
-def lime_form_path(tmp_path):
-    """Write a minimal LimeSurvey XLSForm xlsx and return its path."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "survey"
-    ws.append(["type", "name", "label", "required", "appearance"])
-    for row in LIME_SURVEY_ROWS:
-        ws.append([row["type"], row["name"], row.get("label"), row.get("required"), row.get("appearance")])
-
-    ws_c = wb.create_sheet("choices")
-    ws_c.append(["list_name", "name", "label"])
-    for list_name, choices in LIME_CHOICES.items():
-        for c in choices:
-            ws_c.append([list_name, c["name"], c["label"]])
-
-    ws_s = wb.create_sheet("settings")
-    ws_s.append(["id_string", "version", "default_language"])
-    ws_s.append([LIME_SETTINGS["id_string"], LIME_SETTINGS["version"], LIME_SETTINGS["default_language"]])
-
-    path = tmp_path / "form.xlsx"
-    wb.save(path)
-    return path
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +137,7 @@ class TestNormalizeResponses:
         choices = {"opts": [{"name": "alpha", "label": "Alpha"}]}
         variables = extract_variables(rows, choices)
         response = [{"opts[zzzzz]": "Yes"}]  # "zzzzz" matches nothing
-        with pytest.warns(UserWarning, match="did not match any XLSForm choice code"):
+        with pytest.warns(UserWarning, match="did not match any choice code"):
             result = normalize_responses(variables, response)
         assert result[0]["opts"] == "zzzzz"  # raw key preserved
 
@@ -226,66 +192,3 @@ class TestNormalizeResponses:
         assert normalize_responses(lime_variables, []) == []
 
 
-# ---------------------------------------------------------------------------
-# build_ddi_xml
-# ---------------------------------------------------------------------------
-
-
-class TestLimeBuildDdiXml:
-    def test_returns_valid_xml(self, lime_form_path, lime_responses):
-        xml = build_ddi_xml("Test Survey", lime_form_path, lime_responses)
-        root = fromstring(xml)
-        assert root.tag == "{ddi:codebook:2_5}codeBook"
-
-    def test_study_title(self, lime_form_path, lime_responses):
-        xml = build_ddi_xml("My LimeSurvey", lime_form_path, lime_responses)
-        root = fromstring(xml)
-        titl = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:titl", NS)
-        assert titl.text == "My LimeSurvey"
-
-    def test_variable_count(self, lime_form_path, lime_responses):
-        xml = build_ddi_xml("T", lime_form_path, lime_responses)
-        root = fromstring(xml)
-        variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        # 4 non-select_multiple + 4 binary vars (bereiche expanded) = 8
-        assert len(variables) == 8
-
-    def test_select_multiple_expanded_to_binary_vars(self, lime_form_path, lime_responses):
-        xml = build_ddi_xml("T", lime_form_path, lime_responses)
-        root = fromstring(xml)
-        variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        by_name = {v.get("name"): v for v in variables}
-        # Original single var should not exist
-        assert "bereiche" not in by_name
-        # Binary vars should exist
-        assert "bereiche_holz" in by_name
-        assert "bereiche_metall" in by_name
-        assert "bereiche_textil" in by_name
-        assert "bereiche_digital" in by_name
-        # Each binary var has 0/1 categories
-        catgries = by_name["bereiche_holz"].findall("ddi:catgry", NS)
-        assert len(catgries) == 2
-        vals = [c.find("ddi:catValu", NS).text for c in catgries]
-        assert vals == ["0", "1"]
-
-    def test_select_multiple_has_multipleResp_group(self, lime_form_path, lime_responses):
-        xml = build_ddi_xml("T", lime_form_path, lime_responses)
-        root = fromstring(xml)
-        grps = root.findall(".//ddi:dataDscr/ddi:varGrp", NS)
-        bereiche_grp = [g for g in grps if g.get("name") == "bereiche"]
-        assert len(bereiche_grp) == 1
-        assert bereiche_grp[0].get("type") == "multipleResp"
-
-    @pytest.mark.skipif(
-        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
-        reason="xmllint not available",
-    )
-    def test_validates_against_ddi_xsd(self, lime_form_path, lime_responses, tmp_path):
-        xml = build_ddi_xml("Test Survey", lime_form_path, lime_responses)
-        path = tmp_path / "lime_test.xml"
-        path.write_text(xml, encoding="utf-8")
-        result = subprocess.run(
-            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(path)],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 0, f"XSD validation failed:\n{result.stderr}"

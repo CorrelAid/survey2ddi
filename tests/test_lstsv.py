@@ -8,8 +8,8 @@ import pytest
 
 from limesurvey2ddi.lstsv import parse_lstsv
 from limesurvey2ddi.transform import (
-    build_data_csv_from_lstsv,
-    build_ddi_xml_from_lstsv,
+    build_data_csv,
+    build_ddi_xml,
 )
 
 NS = {"ddi": "ddi:codebook:2_5"}
@@ -156,14 +156,14 @@ class TestParseLstsvComplex:
 
 
 # ---------------------------------------------------------------------------
-# End-to-end: build_ddi_xml_from_lstsv produces XSD-valid XML
+# End-to-end: build_ddi_xml produces XSD-valid XML
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(not XMLLINT_AVAILABLE, reason="xmllint not available")
 @pytest.mark.parametrize("fixture", ["basic_survey", "all_types_survey", "complex_survey"])
 def test_lstsv_pipeline_validates_against_xsd(fixture, tmp_path):
-    xml = build_ddi_xml_from_lstsv(fixture, FIXTURES / f"{fixture}.tsv", [])
+    xml = build_ddi_xml(fixture, FIXTURES / f"{fixture}.tsv", [])
     out = tmp_path / f"{fixture}.xml"
     out.write_text(xml, encoding="utf-8")
     result = subprocess.run(
@@ -173,8 +173,8 @@ def test_lstsv_pipeline_validates_against_xsd(fixture, tmp_path):
     assert result.returncode == 0, f"XSD validation failed:\n{result.stderr}"
 
 
-def test_build_data_csv_from_lstsv_smoke():
-    csv_str = build_data_csv_from_lstsv(FIXTURES / "basic_survey.tsv", [])
+def test_build_data_csv_smoke():
+    csv_str = build_data_csv(FIXTURES / "basic_survey.tsv", [])
     # Header line only (no responses)
     assert csv_str.endswith("\r\n")
     header = csv_str.splitlines()[0].split(",")
@@ -183,8 +183,8 @@ def test_build_data_csv_from_lstsv_smoke():
         assert name in header
 
 
-def test_build_ddi_xml_from_lstsv_has_vars():
-    xml = build_ddi_xml_from_lstsv("Basic", FIXTURES / "basic_survey.tsv", [])
+def test_build_ddi_xml_has_vars():
+    xml = build_ddi_xml("Basic", FIXTURES / "basic_survey.tsv", [])
     root = fromstring(xml)
     names = {v.get("name") for v in root.findall(".//ddi:dataDscr/ddi:var", NS)}
     # respondentname and age should be present

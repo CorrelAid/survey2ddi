@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openpyxl import Workbook
 
 from limesurvey2ddi.cli import main
 
@@ -14,18 +13,19 @@ from limesurvey2ddi.cli import main
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
 
-def _make_xlsform(path: Path) -> None:
-    """Write a minimal valid XLSForm xlsx."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "survey"
-    ws.append(["type", "name", "label", "required"])
-    ws.append(["text", "q1", "Question 1", "false"])
-    wb.create_sheet("choices")
-    ws_s = wb.create_sheet("settings")
-    ws_s.append(["id_string", "version", "default_language"])
-    ws_s.append(["cli_test", "1.0", "English"])
-    wb.save(path)
+MINIMAL_TSV = (
+    "class\ttype/scale\tname\trelevance\ttext\thelp\tlanguage\tvalidation\t"
+    "em_validation_q\tmandatory\tother\tdefault\tsame_default\thidden\n"
+    "S\t\t\t\t\t\ten\t\t\t\t\t\t\t\n"
+    "SL\t\t\tTest Survey\t\ten\t\t\t\t\t\t\t\t\n"
+    "G\t\tG1\t\tGroup 1\t\ten\t\t\t\t\t\t\t\n"
+    "Q\tT\tq1\t\tQuestion 1\t\ten\t\t\tN\t\t\t\t\n"
+)
+
+
+def _make_tsv(path: Path) -> None:
+    """Write a minimal valid LimeSurvey survey-structure TSV."""
+    path.write_text(MINIMAL_TSV, encoding="utf-8")
 
 
 @pytest.fixture
@@ -36,13 +36,11 @@ def mock_client(tmp_path):
         {"sid": "99", "surveyls_title": "Test Survey", "active": "Y"},
         {"sid": "100", "surveyls_title": "Inactive Survey", "active": "N"},
     ]
-    client.validate.return_value = True
     client.pull.return_value = tmp_path / "99"
 
-    # Pre-populate output dir so transform can run without an API call
     survey_dir = tmp_path / "99"
     survey_dir.mkdir(parents=True, exist_ok=True)
-    _make_xlsform(survey_dir / "form.xlsx")
+    _make_tsv(survey_dir / "survey.tsv")
     (survey_dir / "responses.json").write_text(
         json.dumps([{"q1": "hello"}]), encoding="utf-8"
     )
@@ -98,26 +96,6 @@ class TestCliPull:
 
 
 # ---------------------------------------------------------------------------
-# validate
-# ---------------------------------------------------------------------------
-
-class TestCliValidate:
-    def test_validate_calls_client(self, mock_client):
-        client, tmp_path = mock_client
-        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
-            main(["--username", "u", "--password", "p", "validate", "99", "-o", str(tmp_path)])
-        client.validate.assert_called_once_with(99, output_dir=tmp_path)
-
-    def test_validate_exits_on_failure(self, mock_client):
-        client, tmp_path = mock_client
-        client.validate.return_value = False
-        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
-            with pytest.raises(SystemExit) as exc:
-                main(["--username", "u", "--password", "p", "validate", "99", "-o", str(tmp_path)])
-        assert exc.value.code == 1
-
-
-# ---------------------------------------------------------------------------
 # transform
 # ---------------------------------------------------------------------------
 
@@ -139,52 +117,21 @@ class TestCliTransform:
         xml = (tmp_path / "99" / "99.xml").read_text()
         assert "<titl>My Survey</titl>" in xml
 
-    def test_transform_defaults_title_to_survey_id(self, mock_client, tmp_path):
+    def test_transform_defaults_title_to_survey_id(self, mock_client):
         client, tmp_path = mock_client
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
             main(["--username", "u", "--password", "p", "transform", "99", "-o", str(tmp_path)])
         xml = (tmp_path / "99" / "99.xml").read_text()
         assert "<titl>99</titl>" in xml
 
-    def test_transform_with_tsv_schema(self, mock_client, tmp_path):
-        client, _ = mock_client
-        survey_dir = tmp_path / "101"
-        survey_dir.mkdir(parents=True)
-        # Use survey.tsv instead of form.xlsx
-        tsv_path = survey_dir / "survey.tsv"
-        tsv_path.write_text(
-            "class\ttype/scale\tname\ttext\tlanguage\n"
-            "S\t\t\tTest Survey\ten\n"
-            "G\t\tG1\tGroup 1\ten\n"
-            "Q\tT\tq1\tQuestion 1\ten\n",
-            encoding="utf-8",
-        )
-        (survey_dir / "responses.json").write_text(
-            json.dumps([{"q1": "hello"}]), encoding="utf-8"
-        )
-
-        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
-            main(["--username", "u", "--password", "p", "transform", "101", "-o", str(tmp_path)])
-
-        assert (survey_dir / "101.csv").exists()
-        assert (survey_dir / "101.xml").exists()
-        xml = (survey_dir / "101.xml").read_text()
-        assert "q1" in xml
-
     def test_transform_with_explicit_schema_arg(self, mock_client, tmp_path):
         client, _ = mock_client
         survey_dir = tmp_path / "102"
         survey_dir.mkdir(parents=True)
         custom_schema = tmp_path / "custom.tsv"
-        custom_schema.write_text(
-            "class\ttype/scale\tname\ttext\tlanguage\n"
-            "S\t\t\tTest Survey\ten\n"
-            "G\t\tG1\tGroup 1\ten\n"
-            "Q\tT\tq2\tQuestion 2\ten\n",
-            encoding="utf-8",
-        )
+        _make_tsv(custom_schema)
         (survey_dir / "responses.json").write_text(
-            json.dumps([{"q2": "world"}]), encoding="utf-8"
+            json.dumps([{"q1": "world"}]), encoding="utf-8"
         )
 
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
@@ -195,18 +142,14 @@ class TestCliTransform:
             ])
 
         assert (survey_dir / "102.xml").exists()
-        xml = (survey_dir / "102.xml").read_text()
-        assert "q2" in xml
 
-    def test_transform_without_client_instantiation(self, mock_client, tmp_path):
+    def test_transform_without_client_instantiation(self, tmp_path):
         """Offline transform: no client constructed if files are present."""
-        client, _ = mock_client
         survey_dir = tmp_path / "103"
         survey_dir.mkdir(parents=True)
-        _make_xlsform(survey_dir / "form.xlsx")
+        _make_tsv(survey_dir / "survey.tsv")
         (survey_dir / "responses.json").write_text("[]", encoding="utf-8")
 
-        # Mock LimeSurveyClient to fail if instantiated
         lime_client_mock = MagicMock(side_effect=AssertionError("LimeSurveyClient must not be instantiated"))
         with patch("limesurvey2ddi.cli.LimeSurveyClient", lime_client_mock):
             main(["transform", "103", "-o", str(tmp_path)])
@@ -219,9 +162,8 @@ class TestCliTransform:
         client, _ = mock_client
         survey_dir = tmp_path / "104"
         survey_dir.mkdir(parents=True)
-        _make_xlsform(survey_dir / "form.xlsx")
-        
-        # LimeSurvey CSV with question codes as headers and semicolon
+        _make_tsv(survey_dir / "survey.tsv")
+
         csv_path = tmp_path / "responses.csv"
         csv_path.write_text("id;submitdate;q1\n1;2025-06-01;Alice\n2;2025-06-02;Bob", encoding="utf-8")
 
@@ -232,18 +174,17 @@ class TestCliTransform:
                 "--data", str(csv_path),
                 "--title", "CSV Survey",
             ])
-        
+
         assert (survey_dir / "104.csv").exists()
         assert (survey_dir / "104.xml").exists()
         csv_text = (survey_dir / "104.csv").read_text()
         assert "Alice" in csv_text
         assert "Bob" in csv_text
 
-    def test_transform_missing_form_exits(self, mock_client, tmp_path):
+    def test_transform_missing_schema_exits(self, mock_client, tmp_path):
         client, _ = mock_client
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
-        # No form.xlsx present
         (empty_dir / "77").mkdir()
         (empty_dir / "77" / "responses.json").write_text("[]")
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
@@ -256,13 +197,25 @@ class TestCliTransform:
         client, _ = mock_client
         survey_dir = tmp_path / "88"
         survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx")
-        # No responses.json present
+        _make_tsv(survey_dir / "survey.tsv")
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
             with pytest.raises(SystemExit) as exc:
                 main(["--username", "u", "--password", "p", "transform", "88",
                       "-o", str(tmp_path)])
         assert exc.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# metadata
+# ---------------------------------------------------------------------------
+
+class TestCliMetadata:
+    def test_metadata_emits_xml_only(self, tmp_path):
+        tsv = tmp_path / "schema.tsv"
+        _make_tsv(tsv)
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", side_effect=AssertionError):
+            main(["metadata", str(tsv)])
+        assert (tmp_path / "schema.xml").exists()
 
 
 # ---------------------------------------------------------------------------

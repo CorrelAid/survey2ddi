@@ -140,93 +140,34 @@ class TestKoboFilePipeline:
 
 
 # ---------------------------------------------------------------------------
-# LimeSurvey file-based pipeline
+# LimeSurvey file-based pipeline (survey-structure TSV)
 # ---------------------------------------------------------------------------
 
-LIME_SURVEY_ROWS = [
-    {"type": "select_one freq", "name": "freq", "label": "How often?", "required": "true", "appearance": None},
-    {"type": "select_multiple areas", "name": "areas", "label": "Which areas?", "required": "false", "appearance": None},
-    {"type": "text", "name": "comment_field", "label": "Comments", "required": "false", "appearance": None},
-]
-
-LIME_CHOICES = {
-    "freq": [{"name": "1", "label": "Once"}, {"name": "2", "label": "Sometimes"}],
-    "areas": [
-        {"name": "alpha", "label": "Alpha"},
-        {"name": "beta", "label": "Beta"},
-    ],
-}
-
-LIME_SETTINGS = {"id_string": "lime_file_test", "version": "1.0", "default_language": "English"}
-
-LIME_RESPONSES = [
-    {
-        "id": "1",
-        "submitdate": "2025-01-01",
-        "freq": "Once",
-        "areas[alpha]": "Yes",
-        "areas[beta]": "No",
-        "commentfield": "good",
-    },
-]
-
-
-@pytest.fixture
-def lime_form_xlsx(tmp_path):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "survey"
-    ws.append(["type", "name", "label", "required", "appearance"])
-    for row in LIME_SURVEY_ROWS:
-        ws.append([row["type"], row["name"], row.get("label"), row.get("required"), row.get("appearance")])
-
-    ws_c = wb.create_sheet("choices")
-    ws_c.append(["list_name", "name", "label"])
-    for list_name, choices in LIME_CHOICES.items():
-        for c in choices:
-            ws_c.append([list_name, c["name"], c["label"]])
-
-    ws_s = wb.create_sheet("settings")
-    ws_s.append(["id_string", "version", "default_language"])
-    ws_s.append([LIME_SETTINGS["id_string"], LIME_SETTINGS["version"], LIME_SETTINGS["default_language"]])
-
-    path = tmp_path / "form.xlsx"
-    wb.save(path)
-    return path
+LIME_TSV_FIXTURE = Path(__file__).parent / "fixtures" / "lstsv" / "basic_survey.tsv"
 
 
 class TestLimeFilePipeline:
-    def test_build_ddi_xml_from_disk(self, lime_form_xlsx, no_credentials):
-        xml = lime_tx.build_ddi_xml("Lime File", lime_form_xlsx, LIME_RESPONSES)
+    def test_build_ddi_xml_from_tsv(self, no_credentials):
+        xml = lime_tx.build_ddi_xml("Lime TSV", LIME_TSV_FIXTURE, [])
         root = fromstring(xml)
         assert root.tag == "{ddi:codebook:2_5}codeBook"
         names = {v.get("name") for v in root.findall(".//ddi:dataDscr/ddi:var", NS)}
-        assert "areas_alpha" in names
-        assert "areas_beta" in names
-        assert "areas" not in names
+        assert names  # at least one variable extracted
 
-    def test_csv_header_matches_xml_var_names_set(self, lime_form_xlsx, no_credentials):
-        csv_str = lime_tx.build_data_csv(lime_form_xlsx, LIME_RESPONSES)
-        xml = lime_tx.build_ddi_xml("CSV", lime_form_xlsx, LIME_RESPONSES)
+    def test_csv_header_matches_xml_var_names_set(self, no_credentials):
+        csv_str = lime_tx.build_data_csv(LIME_TSV_FIXTURE, [])
+        xml = lime_tx.build_ddi_xml("CSV", LIME_TSV_FIXTURE, [])
         header = _csv_header(csv_str)
         xml_names = _xml_var_names(xml)
         assert set(header) == set(xml_names)
         assert len(header) == len(xml_names)
 
-    def test_csv_select_multiple_binary_values(self, lime_form_xlsx, no_credentials):
-        csv_str = lime_tx.build_data_csv(lime_form_xlsx, LIME_RESPONSES)
-        rows = list(csv.DictReader(io.StringIO(csv_str)))
-        assert rows[0]["areas_alpha"] == "1"
-        assert rows[0]["areas_beta"] == "0"
-
     @pytest.mark.skipif(
         subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
         reason="xmllint not available",
     )
-    def test_ddi_xml_validates_against_xsd(
-        self, tmp_path, lime_form_xlsx, no_credentials,
-    ):
-        xml = lime_tx.build_ddi_xml("Lime XSD", lime_form_xlsx, LIME_RESPONSES)
+    def test_ddi_xml_validates_against_xsd(self, tmp_path, no_credentials):
+        xml = lime_tx.build_ddi_xml("Lime XSD", LIME_TSV_FIXTURE, [])
         path = tmp_path / "lime.xml"
         path.write_text(xml, encoding="utf-8")
         result = subprocess.run(

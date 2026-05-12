@@ -45,9 +45,11 @@ uv run kobo2ddi pull <asset_uid>
 **LimeSurvey:**
 ```bash
 uv run limesurvey2ddi pull <survey_id>
-# Note: For LimeSurvey, also export your "Survey structure" (TSV) 
+# Then export the "Survey structure" (TSV) from LimeSurvey's admin UI
 # and place it in the output folder as survey.tsv
 ```
+
+LimeSurvey schema source is the survey-structure TSV (Surveys → Export → Survey structure). XLSForm input is no longer supported on the LimeSurvey side — use the [xlsform2lstsv](https://github.com/CorrelAid/xlsform2lstsv) bridge if you author surveys in XLSForm.
 
 ### 2. Transform to DDI + CSV
 Once the data is cached locally, generate the standardized outputs.
@@ -60,7 +62,7 @@ uv run kobo2ddi transform <asset_uid>
 # (Must be exported with "XML values and headers" and use , or ; as delimiter)
 uv run kobo2ddi transform <asset_uid> --data path/to/export.csv --title "My Study"
 
-# LimeSurvey (uses cached responses.json + survey.tsv/form.xlsx)
+# LimeSurvey (uses cached responses.json + survey.tsv)
 uv run limesurvey2ddi transform <survey_id> --title "My Research Study"
 
 # OR use a raw CSV export from the GUI instead of the API JSON
@@ -69,6 +71,20 @@ uv run limesurvey2ddi transform <survey_id> --data path/to/export.csv --title "M
 ```
 
 The output will be saved in `output/<id>/` as `<id>.xml` and `<id>.csv`.
+
+### Metadata only (no responses)
+
+If you only need the DDI codebook — e.g. before the survey is fielded, or to import the structure into [qwac](https://qwac.correlaid.org/) — skip the response data entirely. No API call, no CSV output.
+
+```bash
+# KoboToolbox: from a local form.xlsx
+uv run kobo2ddi metadata path/to/form.xlsx --title "My Survey"
+
+# LimeSurvey: survey-structure TSV
+uv run limesurvey2ddi metadata path/to/survey.tsv --title "My Survey"
+```
+
+Output XML lands next to the schema file (override with `-o`).
 
 ## Examples
 
@@ -145,11 +161,11 @@ One-time setup (already done for this repo):
 
 **Plain groups in DDI XML:** `begin_group`/`end_group` blocks without `appearance="table-list"` are not emitted as `<varGrp>` in the XML — their variables appear as standalone `<var>` elements. Groups with `appearance="table-list"` become `<varGrp type="grid">`.
 
-**LimeSurvey `select_multiple` bracket keys:** LimeSurvey truncates option codes to 5 characters in its export (e.g. `metall` → `metal`). The transform recovers the original code via prefix matching. This fails if two choice codes share the same first 5 characters — a `ValueError` is raised in that case. It also fails silently (with a warning) if LimeSurvey uses internal answer codes that have no relation to the XLSForm choice names; this can happen for surveys not originally created from an XLSForm.
+**LimeSurvey `select_multiple` bracket keys:** LimeSurvey truncates option codes to 5 characters in its export (e.g. `metall` → `metal`). The transform recovers the original code via prefix matching. This fails if two choice codes share the same first 5 characters — a `ValueError` is raised in that case. It also fails silently (with a warning) if LimeSurvey uses internal answer codes that have no relation to the schema's choice names.
 
 ## Design
 
-The transform and DDI XML modules (`kobo2ddi/transform.py`, `kobo2ddi/ddi_xml.py`) are source-agnostic — they work with parsed XLSForm data rather than platform-specific objects. The LimeSurvey adapter (`limesurvey2ddi/transform.py`) normalises LimeSurvey's export quirks (underscore stripping, `select_multiple` sub-columns) before passing data to the same core functions.
+The transform and DDI XML modules (`kobo2ddi/transform.py`, `kobo2ddi/ddi_xml.py`) are schema-source-agnostic — they consume parsed survey rows + choices regardless of where they came from. The LimeSurvey adapter (`limesurvey2ddi/lstsv.py`) parses LimeSurvey's survey-structure TSV into the same shape; `limesurvey2ddi/transform.py` then normalises LimeSurvey's response export quirks (underscore stripping, `select_multiple` sub-columns) before passing data to the same core functions.
 
 ### As a Python library
 
@@ -173,8 +189,8 @@ csv_string = build_data_csv(variables, submissions)
 from limesurvey2ddi.transform import build_data_csv, build_ddi_xml
 
 responses = [...] # from LimeSurvey API
-xml_string = build_ddi_xml("My Survey", Path("form.xlsx"), responses)
-csv_string = build_data_csv(Path("form.xlsx"), responses)
+xml_string = build_ddi_xml("My Survey", Path("survey.tsv"), responses)
+csv_string = build_data_csv(Path("survey.tsv"), responses)
 ```
 
 

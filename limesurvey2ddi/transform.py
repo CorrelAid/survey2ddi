@@ -9,7 +9,7 @@ from pathlib import Path
 
 from kobo2ddi.data import build_data_csv as _build_data_csv
 from kobo2ddi.ddi_xml import build_ddi_xml as _build_ddi_xml
-from kobo2ddi.transform import extract_variables, parse_xlsform
+from kobo2ddi.transform import extract_variables
 from limesurvey2ddi.lstsv import parse_lstsv
 
 
@@ -22,7 +22,7 @@ def normalize_responses(
     variables: list[dict],
     responses: list[dict],
 ) -> list[dict]:
-    """Re-key LimeSurvey response dicts to use XLSForm variable names.
+    """Re-key LimeSurvey response dicts to use DDI variable names.
 
     Handles two LimeSurvey export quirks:
     - Underscore stripping: ``beruf_post`` becomes ``berufpost`` in exports.
@@ -30,13 +30,13 @@ def normalize_responses(
       space-separated string of selected choice codes (``"holz"``).
       LimeSurvey truncates option codes to 5 characters in bracket keys
       (``metall`` → ``metal``), so prefix matching is used to recover the
-      original code from the XLSForm choices list.
+      original code from the parsed choices list.
 
     Returns a list of dicts keyed by ``v["_data_key"]``, ready for
-    ``kobo2ddi.transform.build_workbook``.
+    ``kobo2ddi.data.build_data_csv``.
     """
     def _match_choice(subkey: str, choices: list[dict]) -> str:
-        """Return the XLSForm choice code that matches the LimeSurvey bracket *subkey*.
+        """Return the parsed choice code that matches the LimeSurvey bracket *subkey*.
 
         LimeSurvey truncates option codes to 5 characters in bracket keys, so
         prefix matching is used to recover the original code.  Exact match is
@@ -47,7 +47,7 @@ def normalize_responses(
 
         Falls back to the raw *subkey* with a warning when no choice matches,
         which can happen if LimeSurvey uses internal codes not derived from the
-        XLSForm choice names.
+        parsed choice names.
         """
         # Exact match first (no truncation occurred, or code is ≤5 chars)
         exact = [c["name"] for c in choices if c["name"] == subkey]
@@ -68,12 +68,12 @@ def normalize_responses(
                 "their first 5 characters for LimeSurvey export to be unambiguous."
             )
 
-        # No match — LimeSurvey may be using internal codes unrelated to XLSForm names.
+        # No match — LimeSurvey may be using internal codes unrelated to parsed schema names.
         # Return the raw key so data is preserved, but warn the user.
         warnings.warn(
-            f"select_multiple bracket key {subkey!r} did not match any XLSForm "
+            f"select_multiple bracket key {subkey!r} did not match any "
             "choice code. Using raw key. LimeSurvey may be using internal answer "
-            "codes not derived from the XLSForm choice names — check your form.xlsx.",
+            "codes not derived from the choice names — check your survey.tsv.",
             stacklevel=4,
         )
         return subkey
@@ -115,12 +115,12 @@ def normalize_responses(
 
 def build_ddi_xml(
     survey_title: str,
-    form_path: Path,
+    lstsv_path: Path,
     responses: list[dict],
     dataset_filename: str = "data.csv",
 ) -> str:
-    """Build a DDI-Codebook 2.5 XML string for a LimeSurvey survey."""
-    survey_rows, choices_by_list, settings = parse_xlsform(form_path)
+    """Build a DDI-Codebook 2.5 XML string from a LimeSurvey survey-structure TSV."""
+    survey_rows, choices_by_list, settings = parse_lstsv(lstsv_path)
     variables = extract_variables(survey_rows, choices_by_list)
     normalized = normalize_responses(variables, responses)
     return _build_ddi_xml(
@@ -134,42 +134,11 @@ def build_ddi_xml(
 
 
 def build_data_csv(
-    form_path: Path,
-    responses: list[dict],
-) -> str:
-    """RFC 4180 CSV with DDI-aligned headers, from an XLSForm schema."""
-    survey_rows, choices_by_list, _ = parse_xlsform(form_path)
-    variables = extract_variables(survey_rows, choices_by_list)
-    normalized = normalize_responses(variables, responses)
-    return _build_data_csv(variables, normalized)
-
-
-def build_data_csv_from_lstsv(
     lstsv_path: Path,
     responses: list[dict],
 ) -> str:
-    """RFC 4180 CSV with DDI-aligned headers, from a LimeSurvey TSV schema."""
+    """RFC 4180 CSV with DDI-aligned headers, from a LimeSurvey survey-structure TSV."""
     survey_rows, choices_by_list, _ = parse_lstsv(lstsv_path)
     variables = extract_variables(survey_rows, choices_by_list)
     normalized = normalize_responses(variables, responses)
     return _build_data_csv(variables, normalized)
-
-
-def build_ddi_xml_from_lstsv(
-    survey_title: str,
-    lstsv_path: Path,
-    responses: list[dict],
-    dataset_filename: str = "data.csv",
-) -> str:
-    """Like ``build_ddi_xml`` but reads a LimeSurvey survey-structure TSV."""
-    survey_rows, choices_by_list, settings = parse_lstsv(lstsv_path)
-    variables = extract_variables(survey_rows, choices_by_list)
-    normalized = normalize_responses(variables, responses)
-    return _build_ddi_xml(
-        asset_name=survey_title,
-        survey_rows=survey_rows,
-        choices_by_list=choices_by_list,
-        settings=settings,
-        submissions=normalized,
-        dataset_filename=dataset_filename,
-    )

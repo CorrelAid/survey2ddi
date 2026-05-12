@@ -218,90 +218,6 @@ class TestGetResponses:
         assert "submitdate" in result[0]
 
 
-# -- validate ----------------------------------------------------------------
-
-
-class TestValidate:
-    def test_missing_form(self, client, tmp_path):
-        (tmp_path / "99").mkdir()
-        (tmp_path / "99" / "responses.json").write_text("[]")
-        assert client.validate(99, tmp_path) is False
-
-    def test_missing_responses(self, client, tmp_path):
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        assert client.validate(99, tmp_path) is False
-
-    def test_empty_responses(self, client, tmp_path):
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        (survey_dir / "responses.json").write_text("[]")
-        assert client.validate(99, tmp_path) is True
-
-    def test_all_match(self, client, tmp_path):
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "name"), ("integer", "age")])
-        responses = [{"id": "1", "name": "Alice", "age": "30"}]
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is True
-
-    def test_underscore_normalization(self, client, tmp_path):
-        """LimeSurvey strips underscores from codes; validate should still match."""
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(
-            survey_dir / "form.xlsx",
-            [("text", "am_meisten_gebracht"), ("integer", "nps_score")],
-        )
-        # LimeSurvey drops underscores
-        responses = [{"id": "1", "ammeistengebracht": "great", "npsscore": "9"}]
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is True
-
-    def test_select_multiple_subcolumns(self, client, tmp_path):
-        """select_multiple appears as varname[SQxxx] — should match base name."""
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("select_multiple opts", "bereiche")])
-        responses = [{"id": "1", "bereiche[SQ001]": "Yes", "bereiche[SQ002]": "No"}]
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is True
-
-    def test_undocumented_response_column(self, client, tmp_path):
-        """Response column with no match in form → returns False."""
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        responses = [{"id": "1", "q1": "a", "mystery_field": "x"}]
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is False
-
-    def test_form_only_variable_is_ok(self, client, tmp_path):
-        """Variable in form but not in responses is acceptable (optional question)."""
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1"), ("text", "q2")])
-        responses = [{"id": "1", "q1": "a"}]  # q2 not answered
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is True
-
-    def test_metadata_fields_ignored(self, client, tmp_path):
-        """LimeSurvey metadata fields (submitdate, etc.) are not treated as survey vars."""
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        responses = [{
-            "id": "1", "submitdate": "2025-01-01", "startdate": "2025-01-01",
-            "datestamp": "2025-01-01", "lastpage": "1", "startlanguage": "de",
-            "seed": "123", "q1": "answer",
-        }]
-        (survey_dir / "responses.json").write_text(json.dumps(responses))
-        assert client.validate(99, tmp_path) is True
-
-
 # -- pull --------------------------------------------------------------------
 
 
@@ -317,7 +233,7 @@ class TestPull:
         assert len(saved) == 1
         assert saved[0]["q1"] == "a"
 
-    def test_prints_reminder_when_no_form(self, client, tmp_path, capsys):
+    def test_prints_reminder_when_no_tsv(self, client, tmp_path, capsys):
         rows = [{"id": "1", "q1": "a"}]
         with patch.object(
             client._http, "post",
@@ -325,29 +241,4 @@ class TestPull:
         ):
             client.pull(99, output_dir=tmp_path)
         out = capsys.readouterr().out
-        assert "form.xlsx" in out
-
-    def test_auto_validates_when_form_present(self, client, tmp_path):
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        rows = [{"id": "1", "q1": "a"}]
-        with patch.object(
-            client._http, "post",
-            return_value=_rpc_response(_b64_responses(rows)),
-        ):
-            client.pull(99, output_dir=tmp_path)  # should not raise
-
-    def test_exits_on_validation_failure(self, client, tmp_path):
-        survey_dir = tmp_path / "99"
-        survey_dir.mkdir()
-        _make_xlsform(survey_dir / "form.xlsx", [("text", "q1")])
-        # undocumented column in response → validate returns False → sys.exit(1)
-        rows = [{"id": "1", "q1": "a", "unknown": "x"}]
-        with patch.object(
-            client._http, "post",
-            return_value=_rpc_response(_b64_responses(rows)),
-        ):
-            with pytest.raises(SystemExit) as exc:
-                client.pull(99, output_dir=tmp_path)
-        assert exc.value.code == 1
+        assert "survey.tsv" in out

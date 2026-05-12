@@ -3,24 +3,14 @@
 import base64
 import json
 import os
-import sys
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 
-from kobo2ddi.transform import extract_variables, parse_xlsform
-from limesurvey2ddi.transform import _norm
-
 load_dotenv()
 
 DEFAULT_SERVER = "https://lime.correlaid.org"
-
-# LimeSurvey adds these metadata columns to every export — not survey questions
-_LIME_META_FIELDS = {
-    "id", "submitdate", "startdate", "datestamp", "lastpage",
-    "startlanguage", "seed", "ipaddr", "refurl", "token",
-}
 
 
 class LimeSurveyClient:
@@ -124,80 +114,10 @@ class LimeSurveyClient:
                 responses.append(item)        # already flat
         return responses
 
-    # -- validation ----------------------------------------------------------
-
-    def validate(self, survey_id: int, output_dir: Path | None = None) -> bool:
-        """Check that form.xlsx and responses.json correspond to the same survey.
-
-        Compares variable names from the XLSForm against response column names,
-        accounting for LimeSurvey metadata fields and select_multiple sub-columns
-        (stored as varname[SQxxx]).
-
-        Returns True if no undocumented response columns found, False otherwise.
-        """
-        out = (output_dir or Path("output")) / str(survey_id)
-        form_path = out / "form.xlsx"
-        responses_path = out / "responses.json"
-
-        if not form_path.exists():
-            print(f"  form.xlsx not found in {out} — place your XLSForm export there.")
-            return False
-        if not responses_path.exists():
-            print(f"  responses.json not found in {out} — run pull first.")
-            return False
-
-        # Variable names from XLSForm
-        survey_rows, choices_by_list, settings = parse_xlsform(form_path)
-        variables = extract_variables(survey_rows, choices_by_list)
-        form_names = {v["name"] for v in variables}
-
-        # Column names from responses (first response's keys, minus metadata)
-        responses = json.loads(responses_path.read_text())
-        if not responses:
-            print("  responses.json is empty — nothing to validate.")
-            return True
-        response_keys = set(responses[0].keys()) - _LIME_META_FIELDS
-
-        # select_multiple variables appear as varname[SQxxx] in LimeSurvey exports
-        # Reduce those to their base variable name for matching
-        response_base_names: set[str] = set()
-        subcolumn_map: dict[str, str] = {}  # subcolumn → base name
-        for key in response_keys:
-            if "[" in key:
-                base = key.split("[")[0]
-                subcolumn_map[key] = base
-                response_base_names.add(base)
-            else:
-                response_base_names.add(key)
-
-        # LimeSurvey strips underscores from question codes on export.
-        # _norm() from limesurvey2ddi.transform normalises both sides for matching.
-        norm_form = {_norm(n): n for n in form_names}
-        norm_response = {_norm(n): n for n in response_base_names}
-
-        matched_norm = set(norm_form) & set(norm_response)
-        only_in_form = {norm_form[n] for n in set(norm_form) - matched_norm}
-        only_in_responses = {norm_response[n] for n in set(norm_response) - matched_norm}
-
-        print(f"  Matched:            {len(matched_norm)} variable(s)")
-        if only_in_form:
-            print(f"  In form only:       {len(only_in_form)} — {sorted(only_in_form)}")
-        if only_in_responses:
-            print(f"  In responses only:  {len(only_in_responses)} — {sorted(only_in_responses)}")
-            print("  WARNING: undocumented response columns — form.xlsx may not match this survey.")
-            return False
-
-        print("  OK: all response columns are documented in form.xlsx")
-        return True
-
     # -- convenience: pull ---------------------------------------------------
 
     def pull(self, survey_id: int, output_dir: Path | None = None) -> Path:
-        """Download responses into *output_dir*/<survey_id>/responses.json.
-
-        If form.xlsx is already present in the output directory, also validates
-        that the form and responses correspond to the same survey.
-        """
+        """Download responses into *output_dir*/<survey_id>/responses.json."""
         out = (output_dir or Path("output")) / str(survey_id)
         out.mkdir(parents=True, exist_ok=True)
 
@@ -207,13 +127,8 @@ class LimeSurveyClient:
         )
         print(f"Saved {len(responses)} responses to {out / 'responses.json'}")
 
-        form_path = out / "form.xlsx"
-        if form_path.exists():
-            print("Validating form.xlsx against responses:")
-            ok = self.validate(survey_id, output_dir)
-            if not ok:
-                sys.exit(1)
-        else:
-            print(f"Place your XLSForm export as {form_path} for the transform step.")
+        tsv_path = out / "survey.tsv"
+        if not tsv_path.exists():
+            print(f"Place your LimeSurvey survey-structure TSV at {tsv_path} for the transform step.")
 
         return out
