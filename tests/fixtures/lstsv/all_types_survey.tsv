@@ -1,0 +1,70 @@
+class	type/scale	name	relevance	text	help	language	validation	em_validation_q	mandatory	other	default	same_default	hidden
+S		language	1	en		en							
+S		format	1	A		en							
+SL		surveyls_title	1	Workshop-Feedback-Umfrage		en							
+G	1	G0	1	G0		en							
+Q	*	calc1	1	{1 + 1}		en							1
+Q	S	orphanbefore	1	Wie lautet Ihre Teilnehmer-ID?		en							
+G	2	Persönliche Angaben	1			en							
+Q	S	qtext	1	Wie heißen Sie (Vor- und Nachname)?		en							
+Q	S	qstring	1	Wie lautet Ihre E-Mail-Adresse?		en							
+Q	N	qinteger	1	An wie vielen Workshops haben Sie bisher teilgenommen?		en							
+Q	N	qint	1	An wie vielen Sessions haben Sie heute teilgenommen?		en							
+Q	N	qdecimal	1	Wie bewerten Sie den Workshop auf einer Skala von 1,0 bis 10,0?		en							
+Q	D	qdate	1	Wann sind Sie geboren?		en							
+Q	D	qtime	1	Um wie viel Uhr sind Sie angekommen?		en							
+Q	D	qdatetime	1	Wann haben Sie Ihre Anmeldung abgeschlossen?		en							
+Q	L	qselectone	1	Würden Sie diesen Workshop weiterempfehlen?		en							
+A		yes		Ja		en							
+A		no		Nein		en							
+Q	M	qselectmulti	1	An welchen Tracks haben Sie teilgenommen?		en							
+SQ		red		Frontend-Entwicklung		en							
+SQ		blue		Backend-Entwicklung		en							
+SQ		green		Data Science		en							
+Q	R	qrank	1	Ordnen Sie die folgenden Aspekte nach Wichtigkeit		en							
+A		fam		Vernetzung		en							
+A		work		Fachliche Inhalte		en							
+A		fun		Location &amp; Verpflegung		en							
+Q	X	qnote	1	Im nächsten Abschnitt bitten wir Sie um Ihr ausführliches Feedback. Bitte nehmen Sie sich Zeit.		en							
+G	3	Ausführliches Feedback	1			en							
+Q	T	qmultilinetext	1	Beschreiben Sie bitte Ihre Erfahrungen beim Workshop		en							
+Q	T	qmultilinestring	1	Welche Verbesserungsvorschläge haben Sie für künftige Veranstaltungen?		en							
+Q	L	qlikert	1	Wie zufrieden waren Sie mit der Organisation insgesamt?		en							
+A		low		Schlecht		en							
+A		mid		Mittelmäßig		en							
+A		high		Ausgezeichnet		en							
+Q	!	qminimal	1	Bevorzugst du Dropdown?		en							
+A		yes		Ja		en							
+A		no		Nein		en							
+G	4	Programmierkenntnisse	1			en							
+Q	X	matrixwrapper	1	Selbsteinschätzung technischer Fähigkeiten		en							
+Q	F	matrixheader	1	Wie schätzen Sie Ihre Kenntnisse ein?		en							
+SQ		skillpython	1	Python		en							
+SQ		skilljs	1	JavaScript		en							
+SQ		skillsql	1	SQL		en							
+A		none		Keine		en							
+A		basic		Grundkenntnisse		en							
+A		adv		Fortgeschritten		en							
+A		exp		Experte		en							
+G	5	Weitere Fragen	1			en							
+Q	L	qsel1other	1	Welcher Track hat Ihnen am besten gefallen?		en				Y			
+A		red		Frontend-Entwicklung		en							
+A		blue		Backend-Entwicklung		en							
+A		green		Data Science		en							
+Q	M	qselmother	1	Welche Tracks würden Sie erneut besuchen?		en				Y			
+SQ		red		Frontend-Entwicklung		en							
+SQ		blue		Backend-Entwicklung		en							
+SQ		green		Data Science		en							
+Q	R	qrankother	1	Was hat Ihnen an der Veranstaltung am meisten gebracht?		en				Y			
+A		fam		Vernetzung		en							
+A		work		Fachliche Inhalte		en							
+A		fun		Location &amp; Verpflegung		en							
+G	6	Anmeldedaten	1			en							
+Q	S	qmandatory	1	Wie lautet Ihre E-Mail-Adresse?		en			Y				
+Q	S	qhint	1	Wie lautet Ihre Telefonnummer?	Format: +49 123 456789	en							
+Q	N	qconstraint	1	Wie alt sind Sie?		en		self >= 18 and self <= 120					
+Q	S	qdefault	1	In welchem Land leben Sie?		en					Deutschland		
+Q	S	qrelevant	qmandatory != ''	Wie sollen wir Sie kontaktieren?		en							
+Q	S	qallfeatures	qmandatory != ''	Haben Sie noch Anmerkungen?	Freiwillig, aber willkommen	en			Y		Keine Anmerkungen		
+G	7	G6	1	G6		en							
+Q	X	orphanafter	1	Vielen Dank für Ihre Teilnahme an dieser Umfrage!		en							

@@ -122,12 +122,12 @@ class TestCliValidate:
 # ---------------------------------------------------------------------------
 
 class TestCliTransform:
-    def test_transform_creates_xlsx_and_xml(self, mock_client):
+    def test_transform_creates_csv_and_xml(self, mock_client):
         client, tmp_path = mock_client
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
             main(["--username", "u", "--password", "p", "transform", "99", "-o", str(tmp_path)])
         survey_dir = tmp_path / "99"
-        assert (survey_dir / "99.xlsx").exists()
+        assert (survey_dir / "99.csv").exists()
         assert (survey_dir / "99.xml").exists()
 
     def test_transform_uses_title_arg(self, mock_client, capsys):
@@ -136,17 +136,108 @@ class TestCliTransform:
             main(["--username", "u", "--password", "p", "transform", "99",
                   "--title", "My Survey", "-o", str(tmp_path)])
         assert "Wrote" in capsys.readouterr().out
+        xml = (tmp_path / "99" / "99.xml").read_text()
+        assert "<titl>My Survey</titl>" in xml
 
     def test_transform_defaults_title_to_survey_id(self, mock_client, tmp_path):
         client, tmp_path = mock_client
         with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
             main(["--username", "u", "--password", "p", "transform", "99", "-o", str(tmp_path)])
-        import openpyxl
-        wb = openpyxl.load_workbook(tmp_path / "99" / "99.xlsx")
-        ws = wb["survey_info"]
-        info = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value
-                for r in range(2, ws.max_row + 1)}
-        assert info["title"] == "99"
+        xml = (tmp_path / "99" / "99.xml").read_text()
+        assert "<titl>99</titl>" in xml
+
+    def test_transform_with_tsv_schema(self, mock_client, tmp_path):
+        client, _ = mock_client
+        survey_dir = tmp_path / "101"
+        survey_dir.mkdir(parents=True)
+        # Use survey.tsv instead of form.xlsx
+        tsv_path = survey_dir / "survey.tsv"
+        tsv_path.write_text(
+            "class\ttype/scale\tname\ttext\tlanguage\n"
+            "S\t\t\tTest Survey\ten\n"
+            "G\t\tG1\tGroup 1\ten\n"
+            "Q\tT\tq1\tQuestion 1\ten\n",
+            encoding="utf-8",
+        )
+        (survey_dir / "responses.json").write_text(
+            json.dumps([{"q1": "hello"}]), encoding="utf-8"
+        )
+
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
+            main(["--username", "u", "--password", "p", "transform", "101", "-o", str(tmp_path)])
+
+        assert (survey_dir / "101.csv").exists()
+        assert (survey_dir / "101.xml").exists()
+        xml = (survey_dir / "101.xml").read_text()
+        assert "q1" in xml
+
+    def test_transform_with_explicit_schema_arg(self, mock_client, tmp_path):
+        client, _ = mock_client
+        survey_dir = tmp_path / "102"
+        survey_dir.mkdir(parents=True)
+        custom_schema = tmp_path / "custom.tsv"
+        custom_schema.write_text(
+            "class\ttype/scale\tname\ttext\tlanguage\n"
+            "S\t\t\tTest Survey\ten\n"
+            "G\t\tG1\tGroup 1\ten\n"
+            "Q\tT\tq2\tQuestion 2\ten\n",
+            encoding="utf-8",
+        )
+        (survey_dir / "responses.json").write_text(
+            json.dumps([{"q2": "world"}]), encoding="utf-8"
+        )
+
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
+            main([
+                "--username", "u", "--password", "p", "transform", "102",
+                "--schema", str(custom_schema),
+                "-o", str(tmp_path)
+            ])
+
+        assert (survey_dir / "102.xml").exists()
+        xml = (survey_dir / "102.xml").read_text()
+        assert "q2" in xml
+
+    def test_transform_without_client_instantiation(self, mock_client, tmp_path):
+        """Offline transform: no client constructed if files are present."""
+        client, _ = mock_client
+        survey_dir = tmp_path / "103"
+        survey_dir.mkdir(parents=True)
+        _make_xlsform(survey_dir / "form.xlsx")
+        (survey_dir / "responses.json").write_text("[]", encoding="utf-8")
+
+        # Mock LimeSurveyClient to fail if instantiated
+        lime_client_mock = MagicMock(side_effect=AssertionError("LimeSurveyClient must not be instantiated"))
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", lime_client_mock):
+            main(["transform", "103", "-o", str(tmp_path)])
+
+        lime_client_mock.assert_not_called()
+        assert (survey_dir / "103.xml").exists()
+
+    def test_transform_with_csv_data(self, mock_client, tmp_path):
+        """--data uses a CSV file instead of responses.json."""
+        client, _ = mock_client
+        survey_dir = tmp_path / "104"
+        survey_dir.mkdir(parents=True)
+        _make_xlsform(survey_dir / "form.xlsx")
+        
+        # LimeSurvey CSV with question codes as headers and semicolon
+        csv_path = tmp_path / "responses.csv"
+        csv_path.write_text("id;submitdate;q1\n1;2025-06-01;Alice\n2;2025-06-02;Bob", encoding="utf-8")
+
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
+            main([
+                "transform", "104",
+                "-o", str(tmp_path),
+                "--data", str(csv_path),
+                "--title", "CSV Survey",
+            ])
+        
+        assert (survey_dir / "104.csv").exists()
+        assert (survey_dir / "104.xml").exists()
+        csv_text = (survey_dir / "104.csv").read_text()
+        assert "Alice" in csv_text
+        assert "Bob" in csv_text
 
     def test_transform_missing_form_exits(self, mock_client, tmp_path):
         client, _ = mock_client

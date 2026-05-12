@@ -1,10 +1,8 @@
-"""Transform KoboToolbox (or other) survey data into a DDI-adjacent xlsx."""
+"""Parse XLSForm + extract a normalized variable list (source-agnostic)."""
 
-from datetime import date
 from pathlib import Path
 
 import openpyxl
-from openpyxl import Workbook
 
 # Types that don't carry respondent data (skipped entirely during extraction).
 # NOTE: `note` is intentionally NOT skipped — qwacback emits it as a text var
@@ -208,54 +206,3 @@ def extract_variables(
     return variables
 
 
-def build_workbook(
-    asset_name: str,
-    survey_rows: list[dict],
-    choices_by_list: dict[str, list[dict]],
-    settings: dict,
-    submissions: list[dict],
-    source: str = "kobotoolbox",
-) -> Workbook:
-    """Build a DDI-adjacent xlsx workbook from parsed survey data.
-
-    Source-agnostic: LimeSurvey and other adapters pass the same inputs.
-    *submissions* must be keyed by ``v["_data_key"]`` (``"group/name"`` or ``"name"``).
-    *source* is written to the ``survey_info`` sheet (e.g. ``"limesurvey"``).
-    """
-    variables = extract_variables(survey_rows, choices_by_list)
-
-    # --- write workbook ---
-    wb = Workbook()
-
-    # Sheet 1: variables
-    ws_var = wb.active
-    ws_var.title = "variables"
-    var_headers = ["name", "group", "label", "type", "measure", "values", "required", "source_type"]
-    ws_var.append(var_headers)
-    for v in variables:
-        ws_var.append([v[h] for h in var_headers])
-
-    # Sheet 2: data
-    ws_data = wb.create_sheet("data")
-    col_names = [v["name"] for v in variables]
-    data_keys = [v["_data_key"] for v in variables]
-    ws_data.append(col_names)
-    for sub in submissions:
-        ws_data.append([sub.get(dk, "") for dk in data_keys])
-
-    # Sheet 3: survey_info
-    ws_info = wb.create_sheet("survey_info")
-    ws_info.append(["key", "value"])
-    info_rows = [
-        ("title", asset_name),
-        ("id", settings.get("id_string", "")),
-        ("version", settings.get("version", "")),
-        ("language", settings.get("default_language", "")),
-        ("source", source),
-        ("submission_count", len(submissions)),
-        ("export_date", date.today().isoformat()),
-    ]
-    for k, v in info_rows:
-        ws_info.append([k, v])
-
-    return wb

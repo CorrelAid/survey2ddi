@@ -1,16 +1,19 @@
 """CLI for kobo2ddi."""
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
 
 from kobo2ddi.client import KoboClient
+from kobo2ddi.data import build_data_csv
 from kobo2ddi.ddi_xml import build_ddi_xml
-from kobo2ddi.transform import build_workbook, parse_xlsform
+from kobo2ddi.transform import extract_variables, parse_xlsform
 
 
-def cmd_list(client: KoboClient, _args: argparse.Namespace) -> None:
+def cmd_list(make_client, _args: argparse.Namespace) -> None:
+    client = make_client()
     assets = client.list_assets()
     if not assets:
         print("No assets found.")
@@ -20,38 +23,62 @@ def cmd_list(client: KoboClient, _args: argparse.Namespace) -> None:
         print(f"  {a['uid']}  {deployed:<10}  {a['name']}")
 
 
-def cmd_pull(client: KoboClient, args: argparse.Namespace) -> None:
+def cmd_pull(make_client, args: argparse.Namespace) -> None:
     output_dir = Path(args.output) if args.output else None
-    client.pull(args.uid, output_dir=output_dir)
+    make_client().pull(args.uid, output_dir=output_dir)
 
 
-def cmd_transform(client: KoboClient, args: argparse.Namespace) -> None:
+def cmd_transform(make_client, args: argparse.Namespace) -> None:
     output_dir = Path(args.output) if args.output else Path("output")
     uid = args.uid
     asset_dir = output_dir / uid
     form_path = asset_dir / "form.xlsx"
     submissions_path = asset_dir / "submissions.json"
 
-    # Pull data if not already present (or if --refresh)
-    if args.refresh or not form_path.exists() or not submissions_path.exists():
-        client.pull(uid, output_dir=output_dir)
+    # Load submissions from CSV or JSON
+    if args.data:
+        csv_path = Path(args.data)
+        if not csv_path.exists():
+            print(f"Error: {csv_path} not found.")
+            sys.exit(1)
+        with open(csv_path, encoding="utf-8-sig") as f:
+            submissions = list(csv.DictReader(f, delimiter=";"))
+            # Fallback to comma if semicolon didn't work (headers should have /)
+            if not submissions or not any("/" in k for k in submissions[0].keys()):
+                f.seek(0)
+                submissions = list(csv.DictReader(f, delimiter=","))
+    else:
+        needs_pull = args.refresh or not form_path.exists() or not submissions_path.exists()
+        if needs_pull:
+            make_client().pull(uid, output_dir=output_dir)
+        submissions = json.loads(submissions_path.read_text())
 
-    # Load data
-    asset = client.get_asset(uid)
-    submissions = json.loads(submissions_path.read_text())
     survey_rows, choices_by_list, settings = parse_xlsform(form_path)
 
-    # Build and save xlsx
-    wb = build_workbook(asset["name"], survey_rows, choices_by_list, settings, submissions)
-    xlsx_path = asset_dir / f"{uid}.xlsx"
-    wb.save(xlsx_path)
-    print(f"Wrote {xlsx_path}")
+    if args.title:
+        title = args.title
+    else:
+        title = make_client().get_asset(uid)["name"]
 
     # Build and save DDI-Codebook 2.5 XML
-    xml_str = build_ddi_xml(asset["name"], survey_rows, choices_by_list, settings, submissions)
+    xml_str = build_ddi_xml(
+        title,
+        survey_rows,
+        choices_by_list,
+        settings,
+        submissions,
+        dataset_filename=f"{uid}.csv",
+    )
     xml_path = asset_dir / f"{uid}.xml"
     xml_path.write_text(xml_str, encoding="utf-8")
     print(f"Wrote {xml_path}")
+
+    # Build and save DDI-aligned response CSV
+    variables = extract_variables(survey_rows, choices_by_list)
+    csv_str = build_data_csv(variables, submissions)
+    csv_path = asset_dir / f"{uid}.csv"
+    csv_path.write_text(csv_str, encoding="utf-8")
+    print(f"Wrote {csv_path}")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -69,11 +96,19 @@ def main(argv: list[str] | None = None) -> None:
     pull_p.add_argument("uid", help="Asset UID")
     pull_p.add_argument("-o", "--output", help="Output directory (default: ./output)")
 
-    transform_p = sub.add_parser("transform", help="Pull + transform into DDI xlsx")
+    transform_p = sub.add_parser("transform", help="Pull + emit DDI XML and CSV")
     transform_p.add_argument("uid", help="Asset UID")
     transform_p.add_argument("-o", "--output", help="Output directory (default: ./output)")
     transform_p.add_argument(
         "--refresh", action="store_true", help="Re-download data even if cached"
+    )
+    transform_p.add_argument(
+        "--title",
+        help="Survey title (skips API call when form.xlsx + submissions.json are cached)",
+    )
+    transform_p.add_argument(
+        "--data",
+        help="Path to raw Kobo CSV export (must use XML values and headers)",
     )
 
     args = parser.parse_args(argv)
@@ -81,10 +116,17 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         sys.exit(1)
 
-    client = KoboClient(token=args.token, server_url=args.server_url)
+    cached_client: list[KoboClient] = []
+
+    def make_client() -> KoboClient:
+        if not cached_client:
+            cached_client.append(
+                KoboClient(token=args.token, server_url=args.server_url)
+            )
+        return cached_client[0]
 
     commands = {"list": cmd_list, "pull": cmd_pull, "transform": cmd_transform}
-    commands[args.command](client, args)
+    commands[args.command](make_client, args)
 
 
 if __name__ == "__main__":

@@ -4,12 +4,28 @@ version = "0.1.0"
 description = "Transform survey data (KoboToolbox, LimeSurvey) into DDI-adjacent formats"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "CorrelAid" }]
+keywords = ["ddi", "kobotoolbox", "limesurvey", "survey", "xlsform"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = [
     "httpx",
     "openpyxl",
     "python-dotenv",
     "xlrd>=2.0.2",
 ]
+
+[project.urls]
+Repository = "https://github.com/CorrelAid/survey2ddi"
+Issues = "https://github.com/CorrelAid/survey2ddi/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -20,8 +36,15 @@ packages = ["kobo2ddi", "limesurvey2ddi"]
 
 [dependency-groups]
 dev = [
+    "pandas",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+]
+notebook = [
+    "pandas",
+    "jupyter",
+    "lxml",
+    "matplotlib>=3.10.9",
 ]
 
 [tool.pytest.ini_options]

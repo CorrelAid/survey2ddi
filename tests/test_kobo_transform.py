@@ -1,8 +1,6 @@
-"""Tests for kobo2ddi.transform — variable extraction, XLSForm parsing, xlsx output."""
+"""Tests for kobo2ddi.transform — variable extraction, XLSForm parsing."""
 
-from datetime import date
-
-from kobo2ddi.transform import extract_variables, parse_xlsform, build_workbook
+from kobo2ddi.transform import extract_variables, parse_xlsform
 
 
 # -- extract_variables -------------------------------------------------------
@@ -209,72 +207,3 @@ class TestParseXlsform:
         assert by_name["full_name"]["label"] == "Full name"
 
 
-# -- build_workbook ----------------------------------------------------------
-
-
-class TestBuildWorkbook:
-    def test_has_three_sheets(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        assert wb.sheetnames == ["variables", "data", "survey_info"]
-
-    def test_variables_sheet_header(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        ws = wb["variables"]
-        header = [cell.value for cell in ws[1]]
-        assert header == ["name", "group", "label", "type", "measure", "values", "required", "source_type"]
-
-    def test_variables_sheet_row_count(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        ws = wb["variables"]
-        # header + 10 data-carrying variables (9 + `thanks` note)
-        assert ws.max_row == 11
-
-    def test_data_sheet_columns_match_variables(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        ws_var = wb["variables"]
-        ws_data = wb["data"]
-        var_names = [ws_var.cell(row=r, column=1).value for r in range(2, ws_var.max_row + 1)]
-        data_header = [cell.value for cell in ws_data[1]]
-        assert data_header == var_names
-
-    def test_data_sheet_row_count(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        ws = wb["data"]
-        # header + 2 submissions
-        assert ws.max_row == 3
-
-    def test_data_values_mapped_correctly(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        ws = wb["data"]
-        # Row 2 = first submission (Alice)
-        header = [cell.value for cell in ws[1]]
-        row_values = {header[i]: ws.cell(row=2, column=i + 1).value for i in range(len(header))}
-        assert row_values["full_name"] == "Alice"
-        assert row_values["age"] == "30"
-        assert row_values["gender"] == "f"
-
-    def test_survey_info_content(self, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("My Survey", survey_rows, choices_by_list, settings, submissions)
-        ws = wb["survey_info"]
-        info = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value
-                for r in range(2, ws.max_row + 1)}
-        assert info["title"] == "My Survey"
-        assert info["id"] == "test_survey_2025"
-        assert info["version"] == "1.0"
-        assert info["language"] == "English"
-        assert info["source"] == "kobotoolbox"
-        assert info["submission_count"] == 2
-        assert info["export_date"] == date.today().isoformat()
-
-    def test_empty_submissions(self, survey_rows, choices_by_list, settings):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, [])
-        ws = wb["data"]
-        assert ws.max_row == 1  # header only
-
-    def test_roundtrip_through_file(self, tmp_path, survey_rows, choices_by_list, settings, submissions):
-        wb = build_workbook("Test", survey_rows, choices_by_list, settings, submissions)
-        path = tmp_path / "out.xlsx"
-        wb.save(path)
-        import openpyxl
-        wb2 = openpyxl.load_workbook(path)
-        assert wb2.sheetnames == ["variables", "data", "survey_info"]

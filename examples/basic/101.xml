@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<codeBook xmlns="ddi:codebook:2_5" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="ddi:codebook:2_5 https://ddialliance.org/Specification/DDI-Codebook/2.5/XMLSchema/codebook.xsd" version="2.5">
+  <stdyDscr>
+    <citation>
+      <titlStmt>
+        <titl>Basic Example Survey</titl>
+        <IDNo>Basic Survey</IDNo>
+      </titlStmt>
+      <prodStmt>
+        <prodDate date="2026-05-05">2026-05-05</prodDate>
+      </prodStmt>
+      <verStmt>
+        <version>1.0</version>
+      </verStmt>
+    </citation>
+  </stdyDscr>
+  <dataDscr>
+    <var ID="V_respondentname" name="respondentname" intrvl="discrete">
+      <qstn responseDomainType="text">
+        <qstnLit>What is your name?</qstnLit>
+      </qstn>
+      <concept>What is your name?</concept>
+      <varFormat type="character" schema="other"/>
+    </var>
+    <var ID="V_age" name="age" intrvl="contin">
+      <qstn responseDomainType="numeric">
+        <qstnLit>What is your age?</qstnLit>
+      </qstn>
+      <concept>What is your age?</concept>
+      <varFormat type="numeric" schema="other"/>
+    </var>
+    <var ID="V_consent" name="consent" intrvl="discrete">
+      <qstn responseDomainType="category">
+        <qstnLit>Do you consent to participate?</qstnLit>
+      </qstn>
+      <catgry>
+        <catValu>yes</catValu>
+        <labl>Yes</labl>
+      </catgry>
+      <catgry>
+        <catValu>no</catValu>
+        <labl>No</labl>
+      </catgry>
+      <concept>Do you consent to participate?</concept>
+      <varFormat type="numeric" schema="other"/>
+    </var>
+    <var ID="V_thankyou" name="thankyou" intrvl="discrete">
+      <qstn responseDomainType="text">
+        <qstnLit>Thank you for your participation!</qstnLit>
+      </qstn>
+      <concept>Thank you for your participation!</concept>
+      <varFormat type="character" schema="other"/>
+    </var>
+  </dataDscr>
+</codeBook>

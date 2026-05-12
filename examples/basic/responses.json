@@ -1,0 +1,12 @@
+[
+  {
+    "respondentname": "Alice",
+    "age": 25,
+    "consent": "yes"
+  },
+  {
+    "respondentname": "Bob",
+    "age": 30,
+    "consent": "no"
+  }
+]

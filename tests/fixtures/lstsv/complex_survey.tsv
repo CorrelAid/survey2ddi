@@ -1,0 +1,28 @@
+class	type/scale	name	relevance	text	help	language	validation	em_validation_q	mandatory	other	default	same_default	hidden
+S		language	1	en		en							
+S		format	1	A		en							
+SL		surveyls_title	1	Complex Survey with Groups and Logic		en							
+G	1	Demographics	1			en							
+Q	S	fullname	1	Full Name		en			Y				
+Q	N	age	1	Age		en		self >= 18 and self <= 120					
+Q	L	gender	1	Gender		en							
+A		male		Male		en							
+A		feml		Woman		en							
+A		othr		Other		en							
+G	2	Preferences	age >= 18			en							
+Q	M	favoritecolors	1	What are your favorite colors?	Select all that apply	en							
+SQ		red		Red		en							
+SQ		blue		Blue		en							
+SQ		green		Green		en							
+SQ		yello		Yellow		en							
+Q	L	satisfactionlevel	1	How satisfied are you?		en							
+A		happ		Happy		en							
+A		unhp		Unhappy		en							
+Q	R	lifepriorities	1	Rank your life priorities (1 = most important)		en							
+A		famil		Family		en							
+A		caree		Career		en							
+A		healt		Health		en							
+A		frien		Friends		en							
+Q	S	othercomments	satisfactionlevel == 'unhappy'	Any other comments?		en							
+G	3	G2	1	G2		en							
+Q	D	surveydate	1	Date of survey		en					today()		

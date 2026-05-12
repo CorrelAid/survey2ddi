@@ -60,12 +60,17 @@ RESPONSE_DOMAIN_MAP = {
 }
 
 
+def _sanitize_id(name: str) -> str:
+    """xs:ID forbids ``/`` (and other non-NCName chars). Replace with ``_``."""
+    return name.replace("/", "_")
+
+
 def _make_var_id(name: str) -> str:
-    return f"V_{name}"
+    return f"V_{_sanitize_id(name)}"
 
 
 def _make_grp_id(name: str) -> str:
-    return f"VG_{name}"
+    return f"VG_{_sanitize_id(name)}"
 
 
 def _is_grid_group(variables: list[dict], group_name: str) -> bool:
@@ -105,7 +110,7 @@ def _add_var_element(
     intrvl, fmt_type = DDI_TYPE_MAP.get(var_type, ("discrete", "character"))
     resp_domain = RESPONSE_DOMAIN_MAP.get(var_type, "text")
 
-    var_el = SubElement(parent, "var", ID=var_id, name=name, intrvl=intrvl)
+    var_el = SubElement(parent, "var", ID=var_id, name=name, intrvl=intrvl, files="F1")
 
     if label:
         qstn = SubElement(var_el, "qstn", responseDomainType=resp_domain)
@@ -257,7 +262,7 @@ def _add_binary_var(
     choice_label: str,
 ) -> Element:
     """Add a binary 0/1 <var> for a select_multiple option."""
-    var_el = SubElement(parent, "var", ID=var_id, name=name, intrvl="discrete")
+    var_el = SubElement(parent, "var", ID=var_id, name=name, intrvl="discrete", files="F1")
 
     qstn = SubElement(var_el, "qstn", responseDomainType="multiple")
     SubElement(qstn, "preQTxt").text = question_label
@@ -280,6 +285,7 @@ def build_ddi_xml(
     choices_by_list: dict[str, list[dict]],
     settings: dict,
     submissions: list[dict],
+    dataset_filename: str = "data.csv",
 ) -> str:
     """Build a DDI-Codebook 2.5 XML string from parsed survey data.
 
@@ -312,6 +318,17 @@ def build_ddi_xml(
     if ver:
         ver_stmt = SubElement(citation, "verStmt")
         SubElement(ver_stmt, "version").text = str(ver)
+
+    # --- fileDscr ---
+    file_dscr = SubElement(root, "fileDscr", ID="F1", URI=dataset_filename)
+    file_txt = SubElement(file_dscr, "fileTxt")
+    SubElement(file_txt, "fileName").text = dataset_filename
+
+    dimensns = SubElement(file_txt, "dimensns")
+    SubElement(dimensns, "caseQnty").text = str(len(submissions))
+
+    SubElement(file_txt, "fileType").text = "Comma-separated values (CSV)"
+    SubElement(file_txt, "format").text = "text/csv"
 
     # --- dataDscr ---
     data_dscr = SubElement(root, "dataDscr")

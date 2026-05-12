@@ -9,7 +9,7 @@ import pytest
 from openpyxl import Workbook
 
 from kobo2ddi.transform import extract_variables
-from limesurvey2ddi.transform import build_ddi_xml, build_workbook, normalize_responses
+from limesurvey2ddi.transform import build_ddi_xml, normalize_responses
 
 NS = {"ddi": "ddi:codebook:2_5"}
 SCHEMA_PATH = Path(__file__).parent / "schemas" / "codebook.xsd"
@@ -224,79 +224,6 @@ class TestNormalizeResponses:
 
     def test_empty_responses(self, lime_variables):
         assert normalize_responses(lime_variables, []) == []
-
-
-# ---------------------------------------------------------------------------
-# build_workbook
-# ---------------------------------------------------------------------------
-
-
-class TestLimeBuildWorkbook:
-    def test_has_three_sheets(self, lime_form_path, lime_responses):
-        wb = build_workbook("Test Survey", lime_form_path, lime_responses)
-        assert wb.sheetnames == ["variables", "data", "survey_info"]
-
-    def test_source_is_limesurvey(self, lime_form_path, lime_responses):
-        wb = build_workbook("Test Survey", lime_form_path, lime_responses)
-        ws = wb["survey_info"]
-        info = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value
-                for r in range(2, ws.max_row + 1)}
-        assert info["source"] == "limesurvey"
-
-    def test_title_in_survey_info(self, lime_form_path, lime_responses):
-        wb = build_workbook("My LimeSurvey", lime_form_path, lime_responses)
-        ws = wb["survey_info"]
-        info = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value
-                for r in range(2, ws.max_row + 1)}
-        assert info["title"] == "My LimeSurvey"
-
-    def test_export_date_is_today(self, lime_form_path, lime_responses):
-        wb = build_workbook("T", lime_form_path, lime_responses)
-        ws = wb["survey_info"]
-        info = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value
-                for r in range(2, ws.max_row + 1)}
-        assert info["export_date"] == date.today().isoformat()
-
-    def test_data_sheet_has_correct_columns(self, lime_form_path, lime_responses):
-        wb = build_workbook("T", lime_form_path, lime_responses)
-        ws_var = wb["variables"]
-        ws_data = wb["data"]
-        var_names = [ws_var.cell(row=r, column=1).value for r in range(2, ws_var.max_row + 1)]
-        data_header = [cell.value for cell in ws_data[1]]
-        assert data_header == var_names
-
-    def test_simple_field_in_data(self, lime_form_path, lime_responses):
-        wb = build_workbook("T", lime_form_path, lime_responses)
-        ws = wb["data"]
-        header = [cell.value for cell in ws[1]]
-        row = {header[i]: ws.cell(row=2, column=i + 1).value for i in range(len(header))}
-        assert row["haeufigkeit"] == "Once"
-        assert row["am_meisten_gebracht"] == "It was great"
-        assert row["nps_score"] == "9"
-
-    def test_underscore_variable_in_data(self, lime_form_path, lime_responses):
-        """beruf_post (underscore in name) is correctly mapped from berufpost response."""
-        wb = build_workbook("T", lime_form_path, lime_responses)
-        ws = wb["data"]
-        header = [cell.value for cell in ws[1]]
-        row = {header[i]: ws.cell(row=2, column=i + 1).value for i in range(len(header))}
-        assert row["beruf_post"] == "Strongly agree"
-
-    def test_select_multiple_in_data(self, lime_form_path, lime_responses):
-        """bereiche select_multiple shows space-separated selected codes."""
-        wb = build_workbook("T", lime_form_path, lime_responses)
-        ws = wb["data"]
-        header = [cell.value for cell in ws[1]]
-        row = {header[i]: ws.cell(row=2, column=i + 1).value for i in range(len(header))}
-        selected = row["bereiche"].split()
-        assert "holz" in selected
-        assert "textil" in selected
-        assert "metall" not in selected
-
-    def test_empty_responses(self, lime_form_path):
-        wb = build_workbook("T", lime_form_path, [])
-        ws = wb["data"]
-        assert ws.max_row == 1  # header only
 
 
 # ---------------------------------------------------------------------------

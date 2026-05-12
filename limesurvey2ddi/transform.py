@@ -1,16 +1,16 @@
-"""Transform LimeSurvey data into the DDI-adjacent xlsx and XML formats."""
+"""Transform LimeSurvey data into DDI XML + CSV.
+
+Output is a pair: ``<id>.xml`` (DDI-Codebook 2.5) and ``<id>.csv`` (response
+data, headers aligned to ``<var name="">`` in the XML — see ``kobo2ddi.data``).
+"""
 
 import warnings
 from pathlib import Path
 
-from openpyxl import Workbook
-
+from kobo2ddi.data import build_data_csv as _build_data_csv
 from kobo2ddi.ddi_xml import build_ddi_xml as _build_ddi_xml
-from kobo2ddi.transform import (
-    build_workbook as _build_workbook,
-    extract_variables,
-    parse_xlsform,
-)
+from kobo2ddi.transform import extract_variables, parse_xlsform
+from limesurvey2ddi.lstsv import parse_lstsv
 
 
 def _norm(name: str) -> str:
@@ -113,29 +113,11 @@ def normalize_responses(
     return result
 
 
-def build_workbook(
-    survey_title: str,
-    form_path: Path,
-    responses: list[dict],
-) -> Workbook:
-    """Build the DDI-adjacent xlsx workbook for a LimeSurvey survey."""
-    survey_rows, choices_by_list, settings = parse_xlsform(form_path)
-    variables = extract_variables(survey_rows, choices_by_list)
-    normalized = normalize_responses(variables, responses)
-    return _build_workbook(
-        asset_name=survey_title,
-        survey_rows=survey_rows,
-        choices_by_list=choices_by_list,
-        settings=settings,
-        submissions=normalized,
-        source="limesurvey",
-    )
-
-
 def build_ddi_xml(
     survey_title: str,
     form_path: Path,
     responses: list[dict],
+    dataset_filename: str = "data.csv",
 ) -> str:
     """Build a DDI-Codebook 2.5 XML string for a LimeSurvey survey."""
     survey_rows, choices_by_list, settings = parse_xlsform(form_path)
@@ -147,4 +129,47 @@ def build_ddi_xml(
         choices_by_list=choices_by_list,
         settings=settings,
         submissions=normalized,
+        dataset_filename=dataset_filename,
+    )
+
+
+def build_data_csv(
+    form_path: Path,
+    responses: list[dict],
+) -> str:
+    """RFC 4180 CSV with DDI-aligned headers, from an XLSForm schema."""
+    survey_rows, choices_by_list, _ = parse_xlsform(form_path)
+    variables = extract_variables(survey_rows, choices_by_list)
+    normalized = normalize_responses(variables, responses)
+    return _build_data_csv(variables, normalized)
+
+
+def build_data_csv_from_lstsv(
+    lstsv_path: Path,
+    responses: list[dict],
+) -> str:
+    """RFC 4180 CSV with DDI-aligned headers, from a LimeSurvey TSV schema."""
+    survey_rows, choices_by_list, _ = parse_lstsv(lstsv_path)
+    variables = extract_variables(survey_rows, choices_by_list)
+    normalized = normalize_responses(variables, responses)
+    return _build_data_csv(variables, normalized)
+
+
+def build_ddi_xml_from_lstsv(
+    survey_title: str,
+    lstsv_path: Path,
+    responses: list[dict],
+    dataset_filename: str = "data.csv",
+) -> str:
+    """Like ``build_ddi_xml`` but reads a LimeSurvey survey-structure TSV."""
+    survey_rows, choices_by_list, settings = parse_lstsv(lstsv_path)
+    variables = extract_variables(survey_rows, choices_by_list)
+    normalized = normalize_responses(variables, responses)
+    return _build_ddi_xml(
+        asset_name=survey_title,
+        survey_rows=survey_rows,
+        choices_by_list=choices_by_list,
+        settings=settings,
+        submissions=normalized,
+        dataset_filename=dataset_filename,
     )

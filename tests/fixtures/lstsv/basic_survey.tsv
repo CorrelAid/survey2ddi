@@ -1,0 +1,11 @@
+class	type/scale	name	relevance	text	help	language	validation	em_validation_q	mandatory	other	default	same_default	hidden
+S		language	1	en		en							
+S		format	1	A		en							
+SL		surveyls_title	1	Basic Survey		en							
+G		Questions	1	Questions		en							
+Q	S	respondentname	1	What is your name?		en			Y				
+Q	N	age	1	What is your age?		en			Y				
+Q	L	consent	1	Do you consent to participate?		en			Y				
+A		yes		Yes		en							
+A		no		No		en							
+Q	X	thankyou	consent == 'yes'	Thank you for your participation!		en							

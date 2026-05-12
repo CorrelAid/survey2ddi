@@ -48,6 +48,54 @@ class TestBuildDdiXml:
         assert idno is not None
         assert idno.text == "test_survey_2025"
 
+    def test_file_description(self, survey_rows, choices_by_list, settings, submissions):
+        xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions, 
+                            dataset_filename="my_data.csv")
+        root = _parse(xml)
+        file_dscr = root.find("ddi:fileDscr", NS)
+        assert file_dscr is not None
+        assert file_dscr.get("ID") == "F1"
+        assert file_dscr.get("URI") == "my_data.csv"
+        
+        file_name = file_dscr.find("ddi:fileTxt/ddi:fileName", NS)
+        assert file_name is not None
+        assert file_name.text == "my_data.csv"
+        
+        case_cnt = file_dscr.find("ddi:fileTxt/ddi:dimensns/ddi:caseQnty", NS)
+        assert case_cnt is not None
+        assert case_cnt.text == str(len(submissions))
+
+    def test_ddi_standard_association(self, survey_rows, choices_by_list, settings, submissions):
+        """Verify the standard-compliant link between fileDscr and variables."""
+        xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions, dataset_filename="linked_data.csv")
+        root = _parse(xml)
+        
+        # 1. fileDscr must exist with correct ID and URI
+        file_dscr = root.find("ddi:fileDscr", NS)
+        assert file_dscr is not None
+        file_id = file_dscr.get("ID")
+        assert file_id == "F1"
+        assert file_dscr.get("URI") == "linked_data.csv"
+        
+        # 2. All variables must reference this file ID
+        vars = root.findall(".//ddi:var", NS)
+        assert len(vars) > 0
+        for v in vars:
+            assert v.get("files") == file_id
+
+    def test_qwac_compatibility_attributes(self, survey_rows, choices_by_list, settings, submissions):
+        """Verify that qwacback-specific required attributes are still present."""
+        xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
+        root = _parse(xml)
+        
+        # qwacback requires responseDomainType on <qstn>
+        for qstn in root.findall(".//ddi:var/ddi:qstn", NS):
+            assert qstn.get("responseDomainType") is not None
+            
+        # qwacback requires <concept> for labels
+        for var in root.findall(".//ddi:var", NS):
+            assert var.find("ddi:concept", NS) is not None
+
     def test_version(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
