@@ -1,6 +1,6 @@
 """Canonical response layer + DDI-aligned CSV emitter (Track B).
 
-The DDI XML produced by ``kobo2ddi.ddi_xml.build_ddi_xml`` expands every
+The DDI XML produced by ``survey2ddi_core.ddi_xml.build_ddi_xml`` expands every
 ``select_multiple`` question into N binary ``<var>`` elements, one per choice
 (named ``<question>_<choice>``). To keep the data file in lock-step with the
 schema we mirror that expansion in the CSV: each ``select_multiple`` becomes
@@ -10,7 +10,7 @@ trivial.
 
 The matcher is platform-neutral. Source adapters (``kobo2ddi`` is essentially
 identity, ``limesurvey2ddi.transform.normalize_responses`` handles LimeSurvey
-quirks) feed it rows keyed by ``v["_data_key"]`` with ``select_multiple``
+quirks) feed it rows keyed by ``v.data_key`` with ``select_multiple``
 values stored as space-joined choice codes.
 """
 
@@ -19,30 +19,32 @@ from __future__ import annotations
 import csv
 import io
 
+from survey2ddi_core.types import Variable
 
-def get_canonical_columns(variables: list[dict]) -> list[str]:
+
+def get_canonical_columns(variables: list[Variable]) -> list[str]:
     """DDI variable names in the same order ``build_ddi_xml`` emits them.
 
     ``select_multiple`` is expanded to ``<name>_<choice>`` columns. All other
-    variables contribute a single column equal to ``v["name"]``.
+    variables contribute a single column equal to ``v.name``.
     """
     cols: list[str] = []
     for v in variables:
-        if v["type"] == "select_multiple":
-            for c in v["choices"]:
-                cols.append(f'{v["name"]}_{c["name"]}')
+        if v.type == "select_multiple":
+            for c in v.choices:
+                cols.append(f"{v.name}_{c.name}")
         else:
-            cols.append(v["name"])
+            cols.append(v.name)
     return cols
 
 
 def to_canonical_rows(
-    variables: list[dict],
+    variables: list[Variable],
     neutral_rows: list[dict],
 ) -> list[dict]:
     """Re-key adapter rows to DDI variable names.
 
-    *neutral_rows* are keyed by ``v["_data_key"]`` (``"group/name"`` or
+    *neutral_rows* are keyed by ``v.data_key`` (``"group/name"`` or
     ``"name"``).  ``select_multiple`` values are space-joined choice codes;
     they are expanded into per-choice ``"0"``/``"1"`` columns. Every other
     variable becomes a single string column.
@@ -54,20 +56,20 @@ def to_canonical_rows(
     for row in neutral_rows:
         canonical: dict[str, str] = {}
         for v in variables:
-            raw = row.get(v["_data_key"], "")
-            if v["type"] == "select_multiple":
+            raw = row.get(v.data_key, "")
+            if v.type == "select_multiple":
                 selected = set(str(raw).split()) if raw else set()
-                for c in v["choices"]:
-                    col = f'{v["name"]}_{c["name"]}'
-                    canonical[col] = "1" if c["name"] in selected else "0"
+                for c in v.choices:
+                    col = f"{v.name}_{c.name}"
+                    canonical[col] = "1" if c.name in selected else "0"
             else:
-                canonical[v["name"]] = "" if raw is None else str(raw)
+                canonical[v.name] = "" if raw is None else str(raw)
         out.append(canonical)
     return out
 
 
 def build_data_csv(
-    variables: list[dict],
+    variables: list[Variable],
     neutral_rows: list[dict],
 ) -> str:
     """RFC 4180 CSV — headers = DDI ``<var name="">`` in XML order.

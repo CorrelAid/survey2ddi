@@ -1,16 +1,13 @@
 """Tests for kobo2ddi.ddi_xml — DDI-Codebook 2.5 XML generation (qwacback-compliant)."""
 
-import subprocess
-from pathlib import Path
 from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from kobo2ddi.ddi_xml import build_ddi_xml
+from survey2ddi_core.ddi_xml import build_ddi_xml
 
-NS = {"ddi": "ddi:codebook:2_5"}
-SCHEMA_DIR = Path(__file__).parent / "schemas"
-SCHEMA_PATH = SCHEMA_DIR / "codebook.xsd"
+from _helpers import DDI_NS as NS
+from _helpers.xsd import requires_xmllint, validate_with_xsd
 
 
 def _parse(xml_str: str):
@@ -40,6 +37,35 @@ class TestBuildDdiXml:
         titl = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:titl", NS)
         assert titl is not None
         assert titl.text == "My Survey Title"
+
+    def test_title_falls_back_to_settings_form_title(
+        self, survey_rows, choices_by_list, settings, submissions
+    ):
+        settings_with_title = {**settings, "form_title": "From Settings"}
+        xml = build_ddi_xml("", survey_rows, choices_by_list, settings_with_title, submissions)
+        root = _parse(xml)
+        titl = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:titl", NS)
+        assert titl.text == "From Settings"
+
+    def test_title_override_wins_over_settings(
+        self, survey_rows, choices_by_list, settings, submissions
+    ):
+        settings_with_title = {**settings, "form_title": "From Settings"}
+        xml = build_ddi_xml(
+            "Explicit", survey_rows, choices_by_list, settings_with_title, submissions
+        )
+        root = _parse(xml)
+        titl = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:titl", NS)
+        assert titl.text == "Explicit"
+
+    def test_title_defaults_to_untitled(
+        self, survey_rows, choices_by_list, settings, submissions
+    ):
+        settings_no_title = {k: v for k, v in settings.items() if k != "form_title"}
+        xml = build_ddi_xml("", survey_rows, choices_by_list, settings_no_title, submissions)
+        root = _parse(xml)
+        titl = root.find(".//ddi:stdyDscr/ddi:citation/ddi:titlStmt/ddi:titl", NS)
+        assert titl.text == "Untitled"
 
     def test_study_id(self, survey_rows, choices_by_list, settings, submissions):
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
@@ -420,28 +446,10 @@ class TestXsdValidation:
         path.write_text(xml_str, encoding="utf-8")
         return path
 
-    @pytest.mark.skipif(
-        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
-        reason="xmllint not available",
-    )
+    @requires_xmllint
     def test_validates_against_ddi_codebook_25_xsd(self, xml_file):
-        result = subprocess.run(
-            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(xml_file)],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 0, (
-            f"XSD validation failed:\n{result.stderr}"
-        )
+        validate_with_xsd(xml_file)
 
-    @pytest.mark.skipif(
-        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
-        reason="xmllint not available",
-    )
+    @requires_xmllint
     def test_grid_validates_against_xsd(self, grid_xml_file):
-        result = subprocess.run(
-            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(grid_xml_file)],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 0, (
-            f"XSD validation failed:\n{result.stderr}"
-        )
+        validate_with_xsd(grid_xml_file)

@@ -165,16 +165,24 @@ One-time setup (already done for this repo):
 
 ## Design
 
-The transform and DDI XML modules (`kobo2ddi/transform.py`, `kobo2ddi/ddi_xml.py`) are schema-source-agnostic — they consume parsed survey rows + choices regardless of where they came from. The LimeSurvey adapter (`limesurvey2ddi/lstsv.py`) parses LimeSurvey's survey-structure TSV into the same shape; `limesurvey2ddi/transform.py` then normalises LimeSurvey's response export quirks (underscore stripping, `select_multiple` sub-columns) before passing data to the same core functions.
+The package is split into three:
+
+- `survey2ddi_core/` — source-agnostic engine: XLSForm parser (`xlsform.py`), DDI-Codebook 2.5 emitter (`ddi_xml.py`), DDI reader (`ddi.py`), CSV builder (`data.py`), and shared schema types (`types.py` — `Variable`, `Choice` dataclasses).
+- `kobo2ddi/` — KoboToolbox connector (API client + CLI).
+- `limesurvey2ddi/` — LimeSurvey connector (API client, TSV schema parser `lstsv.py`, response-normalisation glue `transform.py`, CLI).
+
+Both connectors emit `list[Variable]` through `survey2ddi_core.xlsform.extract_variables`, then feed the same `build_ddi_xml` / `build_data_csv` pipelines. Adding a third source = new `client.py` + a thin `transform.py` mapping to `Variable`.
 
 ### As a Python library
 
 ```python
+from pathlib import Path
+
 # KoboToolbox
 from kobo2ddi.client import KoboClient
-from kobo2ddi.data import build_data_csv
-from kobo2ddi.ddi_xml import build_ddi_xml
-from kobo2ddi.transform import parse_xlsform, extract_variables
+from survey2ddi_core.data import build_data_csv
+from survey2ddi_core.ddi_xml import build_ddi_xml
+from survey2ddi_core.xlsform import parse_xlsform, extract_variables
 
 client = KoboClient()
 asset = client.get_asset("your_asset_uid")

@@ -9,7 +9,6 @@ Tests must pass with all platform credentials removed from the environment.
 import csv
 import io
 import json
-import subprocess
 import sys
 from pathlib import Path
 from xml.etree.ElementTree import fromstring
@@ -17,13 +16,13 @@ from xml.etree.ElementTree import fromstring
 import pytest
 from openpyxl import Workbook
 
-from kobo2ddi import ddi_xml as kobo_ddi
-from kobo2ddi import transform as kobo_tx
-from kobo2ddi.data import build_data_csv
+from survey2ddi_core import ddi_xml as kobo_ddi
+from survey2ddi_core import xlsform as kobo_tx
+from survey2ddi_core.data import build_data_csv
 from limesurvey2ddi import transform as lime_tx
 
-NS = {"ddi": "ddi:codebook:2_5"}
-SCHEMA_PATH = Path(__file__).parent / "schemas" / "codebook.xsd"
+from _helpers import DDI_NS as NS
+from _helpers.xsd import requires_xmllint, validate_with_xsd
 
 
 @pytest.fixture
@@ -118,10 +117,7 @@ class TestKoboFilePipeline:
         assert alice["hobbies_music"] == "1"
         assert alice["hobbies_reading"] == "0"
 
-    @pytest.mark.skipif(
-        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
-        reason="xmllint not available",
-    )
+    @requires_xmllint
     def test_ddi_xml_validates_against_xsd(
         self, tmp_path, xlsform_path, submissions_json_path, no_credentials,
     ):
@@ -132,11 +128,7 @@ class TestKoboFilePipeline:
         )
         path = tmp_path / "out.xml"
         path.write_text(xml, encoding="utf-8")
-        result = subprocess.run(
-            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(path)],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 0, f"XSD validation failed:\n{result.stderr}"
+        validate_with_xsd(path)
 
 
 # ---------------------------------------------------------------------------
@@ -162,16 +154,9 @@ class TestLimeFilePipeline:
         assert set(header) == set(xml_names)
         assert len(header) == len(xml_names)
 
-    @pytest.mark.skipif(
-        subprocess.run(["which", "xmllint"], capture_output=True).returncode != 0,
-        reason="xmllint not available",
-    )
+    @requires_xmllint
     def test_ddi_xml_validates_against_xsd(self, tmp_path, no_credentials):
         xml = lime_tx.build_ddi_xml("Lime XSD", LIME_TSV_FIXTURE, [])
         path = tmp_path / "lime.xml"
         path.write_text(xml, encoding="utf-8")
-        result = subprocess.run(
-            ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(path)],
-            capture_output=True, text=True,
-        )
-        assert result.returncode == 0, f"XSD validation failed:\n{result.stderr}"
+        validate_with_xsd(path)

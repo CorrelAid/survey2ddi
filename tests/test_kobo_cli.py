@@ -109,6 +109,41 @@ class TestCliTransform:
             main(["--token", "fake", "transform", "abc123", "-o", str(tmp_path)])
         client.get_asset.assert_called_once_with("abc123")
 
+    def test_transform_uses_form_title_from_xlsform(self, mock_client):
+        """XLSForm settings.form_title present → no --title, no API call."""
+        client, tmp_path = mock_client
+        # Rewrite cached form.xlsx with form_title in settings sheet
+        from openpyxl import load_workbook
+        form_path = tmp_path / "abc123" / "form.xlsx"
+        wb = load_workbook(form_path)
+        ws = wb["settings"]
+        # Append form_title column with value
+        headers = [c.value for c in ws[1]]
+        headers.append("form_title")
+        ws.delete_rows(1, ws.max_row)
+        ws.append(headers)
+        ws.append(["test_survey_2025", "1.0", "English", "XLSForm Title"])
+        wb.save(form_path)
+
+        kobo_client_mock = MagicMock(side_effect=AssertionError("API must not be hit"))
+        with patch("kobo2ddi.cli.KoboClient", kobo_client_mock):
+            main(["transform", "abc123", "-o", str(tmp_path)])
+        kobo_client_mock.assert_not_called()
+        xml_text = (tmp_path / "abc123" / "abc123.xml").read_text()
+        assert "<titl>XLSForm Title</titl>" in xml_text
+
+    def test_transform_with_data_no_title_falls_back_to_uid(self, mock_client, tmp_path):
+        """--data + no --title + no form_title → title = uid, no API."""
+        client, tmp_path = mock_client
+        csv_path = tmp_path / "data.csv"
+        csv_path.write_text("demo/full_name;demo/age\nAlice;25", encoding="utf-8")
+        kobo_client_mock = MagicMock(side_effect=AssertionError("API must not be hit"))
+        with patch("kobo2ddi.cli.KoboClient", kobo_client_mock):
+            main(["transform", "abc123", "-o", str(tmp_path), "--data", str(csv_path)])
+        kobo_client_mock.assert_not_called()
+        xml_text = (tmp_path / "abc123" / "abc123.xml").read_text()
+        assert "<titl>abc123</titl>" in xml_text
+
     def test_transform_with_csv_data(self, mock_client, tmp_path):
         """--data uses a CSV file instead of submissions.json."""
         client, tmp_path = mock_client

@@ -4,6 +4,8 @@ from pathlib import Path
 
 import openpyxl
 
+from survey2ddi_core.types import Choice, Variable
+
 # Types that don't carry respondent data (skipped entirely during extraction).
 # NOTE: `note` is intentionally NOT skipped — qwacback emits it as a text var
 # and we mirror that so output is interchangeable with qwacback's converter.
@@ -48,7 +50,9 @@ MEASURE_MAP = {
 }
 
 
-def parse_xlsform(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
+def parse_xlsform(
+    path: Path,
+) -> tuple[list[dict], dict[str, tuple[Choice, ...]], dict]:
     """Parse an XLSForm xlsx into (survey_rows, choices_by_list, settings).
 
     Handles any language suffix on label columns (e.g. ``label::Deutsch``).
@@ -70,21 +74,39 @@ def parse_xlsform(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
     settings_rows = _read_sheet("settings")
     wb.close()
 
-    # Build choices lookup: list_name → [{name, label}, ...]
-    choices_by_list: dict[str, list[dict]] = {}
+    # Build choices lookup: list_name → tuple[Choice, ...]
+    accum: dict[str, list[Choice]] = {}
     choice_label_col = _find_label_col([r.keys() for r in choices_raw[:1]])
     for row in choices_raw:
         ln = row.get("list_name")
         if not ln:
             continue
-        choices_by_list.setdefault(str(ln), []).append({
-            "name": str(row.get("name", "")),
-            "label": str(row.get(choice_label_col, "") or ""),
-        })
+        accum.setdefault(str(ln), []).append(
+            Choice(
+                name=str(row.get("name", "")),
+                label=str(row.get(choice_label_col, "") or ""),
+            )
+        )
+    choices_by_list: dict[str, tuple[Choice, ...]] = {
+        k: tuple(v) for k, v in accum.items()
+    }
 
     settings = settings_rows[0] if settings_rows else {}
 
     return survey_rows, choices_by_list, settings
+
+
+def resolve_title(override: str | None, settings: dict, fallback: str = "") -> str:
+    """Resolve survey title from override, parsed settings.form_title, or fallback.
+
+    Returns the first non-empty value. Used by CLIs to skip remote API lookups
+    when the XLSForm/schema already carries a title.
+    """
+    return (
+        (override or "").strip()
+        or str(settings.get("form_title") or "").strip()
+        or str(fallback or "").strip()
+    )
 
 
 def _find_label_col(header_sets: list) -> str:
@@ -105,20 +127,29 @@ def _find_label_col(header_sets: list) -> str:
 
 def extract_variables(
     survey_rows: list[dict],
-    choices_by_list: dict[str, list[dict]],
-) -> list[dict]:
-    """Extract a flat list of variable dicts from parsed XLSForm data.
-
-    Each variable dict has: name, group, label, type, values (pipe-separated),
-    list_name, choices (list of dicts), required, source_type, _data_key.
+    choices_by_list: dict[str, tuple[Choice, ...]] | dict[str, list[dict]],
+) -> list[Variable]:
+    """Extract a flat list of ``Variable`` from parsed XLSForm data.
 
     Source-agnostic — usable by both xlsx and DDI XML builders.
+    ``choices_by_list`` values may be ``tuple[Choice, ...]`` (canonical) or
+    raw ``list[dict]`` with ``name``/``label`` keys (for convenience in
+    callers building schemas inline).
     """
+    choices_by_list = {
+        ln: tuple(
+            c if isinstance(c, Choice)
+            else Choice(name=str(c.get("name", "")), label=str(c.get("label", "") or ""))
+            for c in items
+        )
+        for ln, items in choices_by_list.items()
+    }
+
     label_col = _find_label_col(
         [r.keys() for r in survey_rows[:1]] if survey_rows else []
     )
 
-    variables: list[dict] = []
+    variables: list[Variable] = []
     group_stack: list[str] = []
     # Track group metadata: name → {label, appearance}
     group_meta: dict[str, dict] = {}
@@ -169,8 +200,8 @@ def extract_variables(
             std_type = TYPE_MAP.get(base_type, base_type)
 
         # Resolve choices
-        choices = choices_by_list.get(list_name, []) if list_name else []
-        values_str = "|".join(f"{c['name']}={c['label']}" for c in choices)
+        choices = choices_by_list.get(list_name, ()) if list_name else ()
+        values_str = "|".join(f"{c.name}={c.label}" for c in choices)
 
         group = "/".join(group_stack) if group_stack else ""
         data_key = f"{group}/{name}" if group else name
@@ -186,22 +217,22 @@ def extract_variables(
         cur_group = group_stack[-1] if group_stack else ""
         gm = group_meta.get(cur_group, {})
 
-        variables.append({
-            "name": name,
-            "group": group,
-            "group_label": gm.get("label", ""),
-            "group_appearance": gm.get("appearance", ""),
-            "label": str(row.get(label_col, "") or ""),
-            "type": std_type,
-            "measure": measure,
-            "list_name": list_name or "",
-            "vocab": vocab,
-            "choices": choices,
-            "values": values_str,
-            "required": str(row.get("required", "false") or "false").lower(),
-            "source_type": raw_type,
-            "_data_key": data_key,
-        })
+        variables.append(Variable(
+            name=name,
+            group=group,
+            group_label=gm.get("label", ""),
+            group_appearance=gm.get("appearance", ""),
+            label=str(row.get(label_col, "") or ""),
+            type=std_type,
+            measure=measure,
+            list_name=list_name or "",
+            vocab=vocab,
+            choices=choices,
+            values=values_str,
+            required=str(row.get("required", "false") or "false").lower(),
+            source_type=raw_type,
+            data_key=data_key,
+        ))
 
     return variables
 

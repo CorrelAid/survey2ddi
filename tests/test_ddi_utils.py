@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from pathlib import Path
-from kobo2ddi.ddi import read_variable_labels, read_value_maps, apply_value_labels
+from survey2ddi_core.ddi import read_variable_labels, read_value_maps, apply_value_labels
 
 SAMPLE_DDI = """<?xml version="1.0" encoding="UTF-8"?>
 <codeBook xmlns="ddi:codebook:2_5" version="2.5">

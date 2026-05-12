@@ -3,12 +3,13 @@
 import csv
 import io
 
-from kobo2ddi.data import (
+from survey2ddi_core.data import (
     build_data_csv,
     get_canonical_columns,
     to_canonical_rows,
 )
-from kobo2ddi.transform import extract_variables
+from survey2ddi_core.types import Variable
+from survey2ddi_core.xlsform import extract_variables
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +122,7 @@ class TestBuildDataCsv:
 
     def test_quoting_for_commas_and_quotes(self):
         """Free-text values containing , or " must be RFC 4180 quoted."""
-        variables = [{
-            "name": "comment", "type": "text", "_data_key": "comment", "choices": [],
-        }]
+        variables = [Variable(name="comment", type="text", data_key="comment")]
         rows = [{"comment": 'a, "b" and c'}]
         csv_str = build_data_csv(variables, rows)
         # csv.DictReader must round-trip the value untouched.

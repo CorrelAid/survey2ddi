@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 from limesurvey2ddi.client import LimeSurveyClient
+from limesurvey2ddi.lstsv import parse_lstsv
 from limesurvey2ddi.transform import build_data_csv, build_ddi_xml
+from survey2ddi_core.xlsform import resolve_title
 
 
 def cmd_list(make_client, _args: argparse.Namespace) -> None:
@@ -58,7 +60,8 @@ def cmd_transform(_make_client, args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    title = args.title or str(survey_id)
+    _, _, schema_settings = parse_lstsv(schema_path)
+    title = resolve_title(args.title, schema_settings, fallback=str(survey_id))
 
     xml_str = build_ddi_xml(
         title, schema_path, responses, dataset_filename=f"{survey_id}.csv"
@@ -80,7 +83,8 @@ def cmd_metadata(_make_client, args: argparse.Namespace) -> None:
         print(f"Error: {schema_path} not found.")
         sys.exit(1)
 
-    title = args.title or schema_path.stem
+    _, _, schema_settings = parse_lstsv(schema_path)
+    title = resolve_title(args.title, schema_settings, fallback=schema_path.stem)
     xml_str = build_ddi_xml(title, schema_path, [])
 
     out_path = Path(args.output) if args.output else schema_path.with_suffix(".xml")

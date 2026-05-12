@@ -1,15 +1,16 @@
 """Transform LimeSurvey data into DDI XML + CSV.
 
 Output is a pair: ``<id>.xml`` (DDI-Codebook 2.5) and ``<id>.csv`` (response
-data, headers aligned to ``<var name="">`` in the XML — see ``kobo2ddi.data``).
+data, headers aligned to ``<var name="">`` in the XML — see ``survey2ddi_core.data``).
 """
 
 import warnings
 from pathlib import Path
 
-from kobo2ddi.data import build_data_csv as _build_data_csv
-from kobo2ddi.ddi_xml import build_ddi_xml as _build_ddi_xml
-from kobo2ddi.transform import extract_variables
+from survey2ddi_core.data import build_data_csv as _build_data_csv
+from survey2ddi_core.ddi_xml import build_ddi_xml as _build_ddi_xml
+from survey2ddi_core.types import Choice, Variable
+from survey2ddi_core.xlsform import extract_variables
 from limesurvey2ddi.lstsv import parse_lstsv
 
 
@@ -19,7 +20,7 @@ def _norm(name: str) -> str:
 
 
 def normalize_responses(
-    variables: list[dict],
+    variables: list[Variable],
     responses: list[dict],
 ) -> list[dict]:
     """Re-key LimeSurvey response dicts to use DDI variable names.
@@ -32,10 +33,10 @@ def normalize_responses(
       (``metall`` → ``metal``), so prefix matching is used to recover the
       original code from the parsed choices list.
 
-    Returns a list of dicts keyed by ``v["_data_key"]``, ready for
-    ``kobo2ddi.data.build_data_csv``.
+    Returns a list of dicts keyed by ``v.data_key``, ready for
+    ``survey2ddi_core.data.build_data_csv``.
     """
-    def _match_choice(subkey: str, choices: list[dict]) -> str:
+    def _match_choice(subkey: str, choices: tuple[Choice, ...]) -> str:
         """Return the parsed choice code that matches the LimeSurvey bracket *subkey*.
 
         LimeSurvey truncates option codes to 5 characters in bracket keys, so
@@ -50,14 +51,14 @@ def normalize_responses(
         parsed choice names.
         """
         # Exact match first (no truncation occurred, or code is ≤5 chars)
-        exact = [c["name"] for c in choices if c["name"] == subkey]
+        exact = [c.name for c in choices if c.name == subkey]
         if exact:
             return exact[0]
 
         # Prefix match: LimeSurvey truncated the code
         prefix_matches = [
-            c["name"] for c in choices
-            if c["name"].startswith(subkey) or subkey.startswith(c["name"])
+            c.name for c in choices
+            if c.name.startswith(subkey) or subkey.startswith(c.name)
         ]
         if len(prefix_matches) == 1:
             return prefix_matches[0]
@@ -94,13 +95,13 @@ def normalize_responses(
 
         normalized: dict[str, str] = {}
         for v in variables:
-            data_key = v["_data_key"]   # "group/name" or just "name"
-            norm_name = _norm(v["name"])
+            data_key = v.data_key   # "group/name" or just "name"
+            norm_name = _norm(v.name)
 
-            if v["type"] == "select_multiple":
+            if v.type == "select_multiple":
                 subs = multi_cols.get(norm_name, {})
                 selected = [
-                    _match_choice(subkey, v["choices"])
+                    _match_choice(subkey, v.choices)
                     for subkey, val in subs.items()
                     if val.lower() in ("yes", "y", "1", "true")
                 ]

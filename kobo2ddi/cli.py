@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 from kobo2ddi.client import KoboClient
-from kobo2ddi.data import build_data_csv
-from kobo2ddi.ddi_xml import build_ddi_xml
-from kobo2ddi.transform import extract_variables, parse_xlsform
+from survey2ddi_core.data import build_data_csv
+from survey2ddi_core.ddi_xml import build_ddi_xml
+from survey2ddi_core.xlsform import extract_variables, parse_xlsform, resolve_title
 
 
 def cmd_list(make_client, _args: argparse.Namespace) -> None:
@@ -55,10 +55,12 @@ def cmd_transform(make_client, args: argparse.Namespace) -> None:
 
     survey_rows, choices_by_list, settings = parse_xlsform(form_path)
 
-    if args.title:
-        title = args.title
-    else:
-        title = make_client().get_asset(uid)["name"]
+    title = resolve_title(args.title, settings)
+    if not title:
+        if args.data:
+            title = uid
+        else:
+            title = make_client().get_asset(uid)["name"]
 
     # Build and save DDI-Codebook 2.5 XML
     xml_str = build_ddi_xml(
@@ -88,7 +90,7 @@ def cmd_metadata(_make_client, args: argparse.Namespace) -> None:
         sys.exit(1)
 
     survey_rows, choices_by_list, settings = parse_xlsform(form_path)
-    title = args.title or form_path.stem
+    title = resolve_title(args.title, settings, fallback=form_path.stem)
 
     xml_str = build_ddi_xml(
         title,

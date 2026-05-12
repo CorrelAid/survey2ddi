@@ -13,7 +13,8 @@ from datetime import date
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 
-from kobo2ddi.transform import extract_variables
+from survey2ddi_core.types import Choice, Variable
+from survey2ddi_core.xlsform import extract_variables
 
 NS = "ddi:codebook:2_5"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
@@ -73,19 +74,19 @@ def _make_grp_id(name: str) -> str:
     return f"VG_{_sanitize_id(name)}"
 
 
-def _is_grid_group(variables: list[dict], group_name: str) -> bool:
+def _is_grid_group(variables: list[Variable], group_name: str) -> bool:
     """A group is a grid if its appearance is table-list."""
     for v in variables:
-        if v["group"] == group_name and v.get("group_appearance"):
-            return "table-list" in v["group_appearance"]
+        if v.group == group_name and v.group_appearance:
+            return "table-list" in v.group_appearance
     return False
 
 
-def _get_group_label(variables: list[dict], group_name: str) -> str:
+def _get_group_label(variables: list[Variable], group_name: str) -> str:
     """Get the label of the group from its member variables."""
     for v in variables:
-        if v["group"] == group_name and v.get("group_label"):
-            return v["group_label"]
+        if v.group == group_name and v.group_label:
+            return v.group_label
     return group_name
 
 
@@ -95,7 +96,7 @@ def _add_var_element(
     name: str,
     label: str,
     var_type: str,
-    choices: list[dict],
+    choices: tuple[Choice, ...] | list[Choice],
     vocab: str = "",
     pre_q_txt: str = "",
 ) -> Element:
@@ -122,8 +123,8 @@ def _add_var_element(
     if not vocab:
         for choice in choices:
             catgry = SubElement(var_el, "catgry")
-            SubElement(catgry, "catValu").text = choice["name"]
-            SubElement(catgry, "labl").text = choice["label"]
+            SubElement(catgry, "catValu").text = choice.name
+            SubElement(catgry, "labl").text = choice.label
 
     concept_attrs = {"vocab": vocab} if vocab else {}
     SubElement(var_el, "concept", **concept_attrs).text = label
@@ -133,7 +134,7 @@ def _add_var_element(
     return var_el
 
 
-def _detect_other_patterns(variables: list[dict]) -> dict[str, dict]:
+def _detect_other_patterns(variables: list[Variable]) -> dict[str, dict]:
     """Detect the semi-open (`_other`) pattern.
 
     A ``_other`` pattern exists when a ``text`` variable named ``<base>_other``
@@ -143,21 +144,21 @@ def _detect_other_patterns(variables: list[dict]) -> dict[str, dict]:
 
     Returns ``{base_name: {"base": <var>, "other_var": <var>, "is_multi": bool}}``.
     """
-    by_name = {v["name"]: v for v in variables}
+    by_name = {v.name: v for v in variables}
     patterns: dict[str, dict] = {}
     for v in variables:
-        if v["type"] != "string" or not v["name"].endswith("_other"):
+        if v.type != "string" or not v.name.endswith("_other"):
             continue
-        base_name = v["name"][: -len("_other")]
+        base_name = v.name[: -len("_other")]
         base = by_name.get(base_name)
-        if not base or base["type"] not in ("select_one", "select_multiple"):
+        if not base or base.type not in ("select_one", "select_multiple"):
             continue
-        if not any(c.get("name") == "other" for c in base.get("choices", [])):
+        if not any(c.name == "other" for c in base.choices):
             continue
         patterns[base_name] = {
             "base": base,
             "other_var": v,
-            "is_multi": base["type"] == "select_multiple",
+            "is_multi": base.type == "select_multiple",
         }
     return patterns
 
@@ -166,16 +167,16 @@ def _emit_other_pattern(data_dscr: Element, p: dict) -> None:
     """Emit the parent <varGrp type="other"> (+ child multipleResp for multi)."""
     base = p["base"]
     other_var = p["other_var"]
-    label = base["label"]
-    base_name = base["name"]
+    label = base.label
+    base_name = base.name
 
     if p["is_multi"]:
         # Child group holds the non-"other" binary vars.
-        non_other = [c for c in base["choices"] if c.get("name") != "other"]
+        non_other = [c for c in base.choices if c.name != "other"]
         child_name = f"{base_name}_choices"
         child_id = _make_grp_id(child_name)
         child_members = " ".join(
-            _make_var_id(f"{base_name}_{c['name']}") for c in non_other
+            _make_var_id(f"{base_name}_{c.name}") for c in non_other
         )
 
         parent_el = SubElement(
@@ -183,7 +184,7 @@ def _emit_other_pattern(data_dscr: Element, p: dict) -> None:
             ID=_make_grp_id(base_name),
             name=base_name,
             type="other",
-            var=_make_var_id(other_var["name"]),
+            var=_make_var_id(other_var.name),
             varGrp=child_id,
         )
         SubElement(parent_el, "txt").text = label
@@ -207,7 +208,7 @@ def _emit_other_pattern(data_dscr: Element, p: dict) -> None:
             type="other",
             var=" ".join([
                 _make_var_id(base_name),
-                _make_var_id(other_var["name"]),
+                _make_var_id(other_var.name),
             ]),
         )
         SubElement(parent_el, "txt").text = label
@@ -218,19 +219,19 @@ def _emit_other_pattern_vars(data_dscr: Element, p: dict) -> None:
     """Emit the <var> elements associated with an _other pattern."""
     base = p["base"]
     other_var = p["other_var"]
-    base_name = base["name"]
+    base_name = base.name
 
     if p["is_multi"]:
         # Binary vars for non-"other" choices only.
-        for choice in base["choices"]:
-            if choice.get("name") == "other":
+        for choice in base.choices:
+            if choice.name == "other":
                 continue
             _add_binary_var(
                 data_dscr,
-                var_id=_make_var_id(f"{base_name}_{choice['name']}"),
-                name=f"{base_name}_{choice['name']}",
-                question_label=base["label"],
-                choice_label=choice["label"],
+                var_id=_make_var_id(f"{base_name}_{choice.name}"),
+                name=f"{base_name}_{choice.name}",
+                question_label=base.label,
+                choice_label=choice.label,
             )
     else:
         # Base select_one retains all categories (including "other").
@@ -238,19 +239,19 @@ def _emit_other_pattern_vars(data_dscr: Element, p: dict) -> None:
             data_dscr,
             var_id=_make_var_id(base_name),
             name=base_name,
-            label=base["label"],
-            var_type=base["type"],
-            choices=base["choices"],
+            label=base.label,
+            var_type=base.type,
+            choices=base.choices,
         )
 
     # The _other text follow-up is always a standalone text var.
     _add_var_element(
         data_dscr,
-        var_id=_make_var_id(other_var["name"]),
-        name=other_var["name"],
-        label=other_var["label"],
-        var_type=other_var["type"],
-        choices=[],
+        var_id=_make_var_id(other_var.name),
+        name=other_var.name,
+        label=other_var.label,
+        var_type=other_var.type,
+        choices=(),
     )
 
 
@@ -282,7 +283,7 @@ def _add_binary_var(
 def build_ddi_xml(
     asset_name: str,
     survey_rows: list[dict],
-    choices_by_list: dict[str, list[dict]],
+    choices_by_list: dict[str, tuple[Choice, ...]],
     settings: dict,
     submissions: list[dict],
     dataset_filename: str = "data.csv",
@@ -292,6 +293,12 @@ def build_ddi_xml(
     Same source-agnostic signature as ``build_workbook``.
     """
     variables = extract_variables(survey_rows, choices_by_list)
+
+    title = (
+        (asset_name or "").strip()
+        or str(settings.get("form_title") or "").strip()
+        or "Untitled"
+    )
 
     root = Element("codeBook")
     root.set("xmlns", NS)
@@ -304,7 +311,7 @@ def build_ddi_xml(
     citation = SubElement(stdy, "citation")
 
     titl_stmt = SubElement(citation, "titlStmt")
-    SubElement(titl_stmt, "titl").text = asset_name
+    SubElement(titl_stmt, "titl").text = title
     study_id = settings.get("id_string", "")
     if study_id:
         SubElement(titl_stmt, "IDNo").text = str(study_id)
@@ -336,21 +343,21 @@ def build_ddi_xml(
     # Detect _other (semi-open) patterns: a text var named <base>_other paired
     # with a base select_one/select_multiple that has an "other" category.
     other_patterns = _detect_other_patterns(variables)
-    base_names_in_other = {p["base"]["name"] for p in other_patterns.values()}
-    other_var_names = {p["other_var"]["name"] for p in other_patterns.values()}
+    base_names_in_other = {p["base"].name for p in other_patterns.values()}
+    other_var_names = {p["other_var"].name for p in other_patterns.values()}
 
     # Classify remaining variables
-    grid_groups: dict[str, list[dict]] = defaultdict(list)
-    multi_resp_groups: dict[str, dict] = {}  # name → variable dict
-    standalone_vars: list[dict] = []
+    grid_groups: dict[str, list[Variable]] = defaultdict(list)
+    multi_resp_groups: dict[str, Variable] = {}
+    standalone_vars: list[Variable] = []
 
     for v in variables:
         # Skip vars consumed by an _other pattern; they're emitted separately.
-        if v["name"] in base_names_in_other or v["name"] in other_var_names:
+        if v.name in base_names_in_other or v.name in other_var_names:
             continue
-        group = v["group"]
-        if v["type"] == "select_multiple":
-            multi_resp_groups[v["name"]] = v
+        group = v.group
+        if v.type == "select_multiple":
+            multi_resp_groups[v.name] = v
         elif group and _is_grid_group(variables, group):
             grid_groups[group].append(v)
         else:
@@ -362,7 +369,7 @@ def build_ddi_xml(
     # shared question stem (qwacback's canonical grid convention).
     for group_name, members in grid_groups.items():
         group_label = _get_group_label(variables, group_name)
-        member_ids = [_make_var_id(m["name"]) for m in members]
+        member_ids = [_make_var_id(m.name) for m in members]
         grp_el = SubElement(
             data_dscr, "varGrp",
             ID=_make_grp_id(group_name),
@@ -375,7 +382,7 @@ def build_ddi_xml(
 
     # MultipleResp groups (from standalone select_multiple)
     for sm_name, sm_var in multi_resp_groups.items():
-        binary_ids = [_make_var_id(f"{sm_name}_{c['name']}") for c in sm_var["choices"]]
+        binary_ids = [_make_var_id(f"{sm_name}_{c.name}") for c in sm_var.choices]
         grp_el = SubElement(
             data_dscr, "varGrp",
             ID=_make_grp_id(sm_name),
@@ -383,8 +390,8 @@ def build_ddi_xml(
             type="multipleResp",
             var=" ".join(binary_ids),
         )
-        SubElement(grp_el, "txt").text = sm_var["label"]
-        SubElement(grp_el, "concept").text = sm_var["label"]
+        SubElement(grp_el, "txt").text = sm_var.label
+        SubElement(grp_el, "concept").text = sm_var.label
 
     # _other (semi-open) pattern groups
     for base_name, p in other_patterns.items():
@@ -398,23 +405,23 @@ def build_ddi_xml(
         for v in members:
             _add_var_element(
                 data_dscr,
-                var_id=_make_var_id(v["name"]),
-                name=v["name"],
-                label=v["label"],
-                var_type=v["type"],
-                choices=v["choices"],
+                var_id=_make_var_id(v.name),
+                name=v.name,
+                label=v.label,
+                var_type=v.type,
+                choices=v.choices,
                 pre_q_txt=group_label,
             )
 
     # Binary vars for select_multiple
     for sm_name, sm_var in multi_resp_groups.items():
-        for choice in sm_var["choices"]:
+        for choice in sm_var.choices:
             _add_binary_var(
                 data_dscr,
-                var_id=_make_var_id(f"{sm_name}_{choice['name']}"),
-                name=f"{sm_name}_{choice['name']}",
-                question_label=sm_var["label"],
-                choice_label=choice["label"],
+                var_id=_make_var_id(f"{sm_name}_{choice.name}"),
+                name=f"{sm_name}_{choice.name}",
+                question_label=sm_var.label,
+                choice_label=choice.label,
             )
 
     # Vars emitted by the _other pattern handler
@@ -425,12 +432,12 @@ def build_ddi_xml(
     for v in standalone_vars:
         _add_var_element(
             data_dscr,
-            var_id=_make_var_id(v["name"]),
-            name=v["name"],
-            label=v["label"],
-            var_type=v["type"],
-            choices=v["choices"],
-            vocab=v.get("vocab", ""),
+            var_id=_make_var_id(v.name),
+            name=v.name,
+            label=v.label,
+            var_type=v.type,
+            choices=v.choices,
+            vocab=v.vocab,
         )
 
     # Pretty-print

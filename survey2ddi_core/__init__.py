@@ -1,4 +1,4 @@
-"""KoboToolbox API client — pull survey data for DDI conversion."""
+"""Source-agnostic DDI-Codebook 2.5 engine shared by kobo2ddi and limesurvey2ddi."""
 
 from survey2ddi_core.ddi import apply_value_labels, read_value_maps, read_variable_labels
 

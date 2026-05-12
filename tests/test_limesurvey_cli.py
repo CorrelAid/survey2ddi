@@ -22,6 +22,15 @@ MINIMAL_TSV = (
     "Q\tT\tq1\t\tQuestion 1\t\ten\t\t\tN\t\t\t\t\n"
 )
 
+TSV_WITH_TITLE = (
+    "class\ttype/scale\tname\trelevance\ttext\thelp\tlanguage\tvalidation\t"
+    "em_validation_q\tmandatory\tother\tdefault\tsame_default\thidden\n"
+    "S\t\tlanguage\t\ten\t\ten\t\t\t\t\t\t\t\n"
+    "SL\t\tsurveyls_title\t\tSurvey From TSV\t\ten\t\t\t\t\t\t\t\n"
+    "G\t\tG1\t\tGroup 1\t\ten\t\t\t\t\t\t\t\n"
+    "Q\tT\tq1\t\tQuestion 1\t\ten\t\t\tN\t\t\t\t\n"
+)
+
 
 def _make_tsv(path: Path) -> None:
     """Write a minimal valid LimeSurvey survey-structure TSV."""
@@ -123,6 +132,29 @@ class TestCliTransform:
             main(["--username", "u", "--password", "p", "transform", "99", "-o", str(tmp_path)])
         xml = (tmp_path / "99" / "99.xml").read_text()
         assert "<titl>99</titl>" in xml
+
+    def test_transform_uses_form_title_from_schema(self, mock_client, tmp_path):
+        """TSV with surveyls_title → no --title falls back to schema title, not survey_id."""
+        client, _ = mock_client
+        survey_dir = tmp_path / "555"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.tsv").write_text(TSV_WITH_TITLE, encoding="utf-8")
+        (survey_dir / "responses.json").write_text("[]", encoding="utf-8")
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
+            main(["transform", "555", "-o", str(tmp_path)])
+        xml = (survey_dir / "555.xml").read_text()
+        assert "<titl>Survey From TSV</titl>" in xml
+
+    def test_transform_explicit_title_overrides_schema(self, mock_client, tmp_path):
+        client, _ = mock_client
+        survey_dir = tmp_path / "556"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.tsv").write_text(TSV_WITH_TITLE, encoding="utf-8")
+        (survey_dir / "responses.json").write_text("[]", encoding="utf-8")
+        with patch("limesurvey2ddi.cli.LimeSurveyClient", return_value=client):
+            main(["transform", "556", "--title", "CLI Wins", "-o", str(tmp_path)])
+        xml = (survey_dir / "556.xml").read_text()
+        assert "<titl>CLI Wins</titl>" in xml
 
     def test_transform_with_explicit_schema_arg(self, mock_client, tmp_path):
         client, _ = mock_client

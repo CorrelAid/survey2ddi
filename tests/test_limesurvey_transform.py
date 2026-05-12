@@ -2,7 +2,7 @@
 
 import pytest
 
-from kobo2ddi.transform import extract_variables
+from survey2ddi_core.xlsform import extract_variables
 from limesurvey2ddi.transform import normalize_responses
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ class TestNormalizeResponses:
 
     def test_select_multiple_ambiguous_prefix_raises(self):
         """Two choice codes sharing the same 5-char prefix → ValueError, not silent wrong data."""
-        from kobo2ddi.transform import extract_variables
+        from survey2ddi_core.xlsform import extract_variables
         rows = [{"type": "select_multiple tags", "name": "tags", "label": "Tags", "required": "false"}]
         # "optie_a" and "optie_b" both truncate to "optie" in LimeSurvey bracket keys
         choices = {"tags": [{"name": "optie_a", "label": "A"}, {"name": "optie_b", "label": "B"}]}
@@ -132,7 +132,7 @@ class TestNormalizeResponses:
 
     def test_select_multiple_unknown_bracket_key_warns(self):
         """Bracket key with no matching choice code → warning, raw key used."""
-        from kobo2ddi.transform import extract_variables
+        from survey2ddi_core.xlsform import extract_variables
         rows = [{"type": "select_multiple opts", "name": "opts", "label": "Opts", "required": "false"}]
         choices = {"opts": [{"name": "alpha", "label": "Alpha"}]}
         variables = extract_variables(rows, choices)
@@ -162,7 +162,7 @@ class TestNormalizeResponses:
     def test_keyed_by_data_key(self, lime_variables, lime_responses):
         """Output is keyed by _data_key, which equals name when no group."""
         result = normalize_responses(lime_variables, lime_responses)
-        by_name = {v["name"]: v["_data_key"] for v in lime_variables}
+        by_name = {v.name: v.data_key for v in lime_variables}
         for var_name, data_key in by_name.items():
             assert data_key in result[0]
 

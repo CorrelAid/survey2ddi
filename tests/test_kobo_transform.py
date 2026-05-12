@@ -1,6 +1,6 @@
 """Tests for kobo2ddi.transform — variable extraction, XLSForm parsing."""
 
-from kobo2ddi.transform import extract_variables, parse_xlsform
+from survey2ddi_core.xlsform import extract_variables, parse_xlsform, resolve_title
 
 
 # -- extract_variables -------------------------------------------------------
@@ -9,7 +9,7 @@ from kobo2ddi.transform import extract_variables, parse_xlsform
 class TestExtractVariables:
     def test_returns_only_data_carrying_types(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        names = [v["name"] for v in variables]
+        names = [v.name for v in variables]
         # data-carrying fields present
         assert "full_name" in names
         assert "age" in names
@@ -21,77 +21,77 @@ class TestExtractVariables:
 
     def test_group_tracking(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["group"] == "demo"
-        assert by_name["satisfaction"]["group"] == "feedback"
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].group == "demo"
+        assert by_name["satisfaction"].group == "feedback"
 
     def test_data_key_includes_group(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["_data_key"] == "demo/full_name"
-        assert by_name["satisfaction"]["_data_key"] == "feedback/satisfaction"
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].data_key == "demo/full_name"
+        assert by_name["satisfaction"].data_key == "feedback/satisfaction"
 
     def test_type_mapping(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["type"] == "string"
-        assert by_name["age"]["type"] == "integer"
-        assert by_name["gender"]["type"] == "select_one"
-        assert by_name["hobbies"]["type"] == "select_multiple"
-        assert by_name["satisfaction"]["type"] == "select_one"
-        assert by_name["score"]["type"] == "range"
-        assert by_name["rating"]["type"] == "decimal"
-        assert by_name["visit_date"]["type"] == "date"
-        assert by_name["calc_field"]["type"] == "calculate"
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].type == "string"
+        assert by_name["age"].type == "integer"
+        assert by_name["gender"].type == "select_one"
+        assert by_name["hobbies"].type == "select_multiple"
+        assert by_name["satisfaction"].type == "select_one"
+        assert by_name["score"].type == "range"
+        assert by_name["rating"].type == "decimal"
+        assert by_name["visit_date"].type == "date"
+        assert by_name["calc_field"].type == "calculate"
 
     def test_choices_resolved(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
+        by_name = {v.name: v for v in variables}
         gender = by_name["gender"]
-        assert len(gender["choices"]) == 3
-        assert gender["values"] == "m=Male|f=Female|other=Other"
+        assert len(gender.choices) == 3
+        assert gender.values == "m=Male|f=Female|other=Other"
 
     def test_no_choices_for_non_select(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["choices"] == []
-        assert by_name["full_name"]["values"] == ""
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].choices == ()
+        assert by_name["full_name"].values == ""
 
     def test_source_type_preserved(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["gender"]["source_type"] == "select_one gender"
-        assert by_name["full_name"]["source_type"] == "text"
+        by_name = {v.name: v for v in variables}
+        assert by_name["gender"].source_type == "select_one gender"
+        assert by_name["full_name"].source_type == "text"
 
     def test_measure_inference(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["measure"] == ""  # string → empty
-        assert by_name["age"]["measure"] == "ratio"
-        assert by_name["gender"]["measure"] == "nominal"
-        assert by_name["hobbies"]["measure"] == "nominal"
-        assert by_name["satisfaction"]["measure"] == "ordinal"  # likert
-        assert by_name["score"]["measure"] == "ratio"
-        assert by_name["rating"]["measure"] == "ratio"
-        assert by_name["visit_date"]["measure"] == "interval"
-        assert by_name["calc_field"]["measure"] == ""  # calculate → empty
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].measure == ""  # string → empty
+        assert by_name["age"].measure == "ratio"
+        assert by_name["gender"].measure == "nominal"
+        assert by_name["hobbies"].measure == "nominal"
+        assert by_name["satisfaction"].measure == "ordinal"  # likert
+        assert by_name["score"].measure == "ratio"
+        assert by_name["rating"].measure == "ratio"
+        assert by_name["visit_date"].measure == "interval"
+        assert by_name["calc_field"].measure == ""  # calculate → empty
 
     def test_likert_detected_by_list_name(self):
         rows = [{"type": "select_one likert_scale", "name": "q1", "label": "Q1", "required": "false"}]
         choices = {"likert_scale": [{"name": "1", "label": "Low"}, {"name": "2", "label": "High"}]}
         variables = extract_variables(rows, choices)
-        assert variables[0]["measure"] == "ordinal"
+        assert variables[0].measure == "ordinal"
 
     def test_likert_detected_by_appearance(self):
         rows = [{"type": "select_one mylist", "name": "q1", "label": "Q1", "required": "false", "appearance": "likert"}]
         choices = {"mylist": [{"name": "1", "label": "Low"}, {"name": "2", "label": "High"}]}
         variables = extract_variables(rows, choices)
-        assert variables[0]["measure"] == "ordinal"
+        assert variables[0].measure == "ordinal"
 
     def test_unknown_type_passed_through(self):
         rows = [{"type": "newtype", "name": "x", "label": "X", "required": "false"}]
         variables = extract_variables(rows, {})
-        assert variables[0]["type"] == "newtype"
+        assert variables[0].type == "newtype"
 
     def test_empty_survey_rows(self):
         assert extract_variables([], {}) == []
@@ -110,8 +110,8 @@ class TestExtractVariables:
         rows = [{"type": "note", "name": "thanks", "label": "Thank you"}]
         variables = extract_variables(rows, {})
         assert len(variables) == 1
-        assert variables[0]["name"] == "thanks"
-        assert variables[0]["type"] == "note"
+        assert variables[0].name == "thanks"
+        assert variables[0].type == "note"
 
     def test_blank_type_row_skipped(self):
         """Rows with an empty/None type are silently skipped (line 126)."""
@@ -120,7 +120,7 @@ class TestExtractVariables:
             {"type": "text", "name": "real", "label": "Real"},
         ]
         variables = extract_variables(rows, {})
-        names = [v["name"] for v in variables]
+        names = [v.name for v in variables]
         assert "phantom" not in names
         assert "real" in names
 
@@ -131,7 +131,7 @@ class TestExtractVariables:
             {"type": "text", "name": "named", "label": "Named"},
         ]
         variables = extract_variables(rows, {})
-        names = [v["name"] for v in variables]
+        names = [v.name for v in variables]
         assert "" not in names
         assert "named" in names
 
@@ -151,8 +151,8 @@ class TestParseXlsform:
         _, choices, _ = parse_xlsform(xlsform_path)
         assert "gender" in choices
         assert len(choices["gender"]) == 3
-        assert choices["gender"][0]["name"] == "m"
-        assert choices["gender"][0]["label"] == "Male"
+        assert choices["gender"][0].name == "m"
+        assert choices["gender"][0].label == "Male"
 
     def test_parses_settings(self, xlsform_path):
         _, _, settings = parse_xlsform(xlsform_path)
@@ -200,10 +200,27 @@ class TestParseXlsform:
         """The fixture uses label::English — verify it's picked up correctly."""
         survey_rows, _, _ = parse_xlsform(xlsform_path)
         # extract_variables should find the label::English column
-        from kobo2ddi.transform import extract_variables
+        from survey2ddi_core.xlsform import extract_variables
         _, choices, _ = parse_xlsform(xlsform_path)
         variables = extract_variables(survey_rows, choices)
-        by_name = {v["name"]: v for v in variables}
-        assert by_name["full_name"]["label"] == "Full name"
+        by_name = {v.name: v for v in variables}
+        assert by_name["full_name"].label == "Full name"
+
+
+class TestResolveTitle:
+    def test_override_wins(self):
+        assert resolve_title("Explicit", {"form_title": "Settings"}, "fb") == "Explicit"
+
+    def test_form_title_used_when_no_override(self):
+        assert resolve_title(None, {"form_title": "Settings"}, "fb") == "Settings"
+
+    def test_empty_override_treated_as_missing(self):
+        assert resolve_title("  ", {"form_title": "Settings"}, "fb") == "Settings"
+
+    def test_fallback_when_nothing_set(self):
+        assert resolve_title(None, {}, "fb") == "fb"
+
+    def test_empty_string_everywhere(self):
+        assert resolve_title("", {"form_title": ""}, "") == ""
 
 

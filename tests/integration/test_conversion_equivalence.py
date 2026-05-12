@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from kobo2ddi.ddi_xml import build_ddi_xml
+from survey2ddi_core.ddi_xml import build_ddi_xml
 
 pytestmark = pytest.mark.integration
 

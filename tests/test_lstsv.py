@@ -1,6 +1,5 @@
 """Tests for the LimeSurvey survey-structure TSV parser and pipeline."""
 
-import subprocess
 from pathlib import Path
 from xml.etree.ElementTree import fromstring
 
@@ -12,13 +11,10 @@ from limesurvey2ddi.transform import (
     build_ddi_xml,
 )
 
-NS = {"ddi": "ddi:codebook:2_5"}
-SCHEMA_PATH = Path(__file__).parent / "schemas" / "codebook.xsd"
-FIXTURES = Path(__file__).parent / "fixtures" / "lstsv"
+from _helpers import DDI_NS as NS
+from _helpers.xsd import requires_xmllint, validate_with_xsd
 
-XMLLINT_AVAILABLE = (
-    subprocess.run(["which", "xmllint"], capture_output=True).returncode == 0
-)
+FIXTURES = Path(__file__).parent / "fixtures" / "lstsv"
 
 
 def _types(survey_rows):
@@ -63,7 +59,7 @@ class TestParseLstsvBasic:
     def test_choices_attached_to_select_one(self, parsed):
         _, choices, _ = parsed
         assert "consent_list" in choices
-        codes = [c["name"] for c in choices["consent_list"]]
+        codes = [c.name for c in choices["consent_list"]]
         assert "yes" in codes and "no" in codes
 
     def test_required_flag(self, parsed):
@@ -99,12 +95,12 @@ class TestParseLstsvAllTypes:
 
     def test_select_multiple_subquestions_become_choices(self, parsed):
         _, choices, _ = parsed
-        codes = [c["name"] for c in choices["qselectmulti_list"]]
+        codes = [c.name for c in choices["qselectmulti_list"]]
         assert codes == ["red", "blue", "green"]
 
     def test_rank_answers_become_choices(self, parsed):
         _, choices, _ = parsed
-        codes = [c["name"] for c in choices["qrank_list"]]
+        codes = [c.name for c in choices["qrank_list"]]
         assert codes == ["fam", "work", "fun"]
 
     def test_matrix_emits_table_list_group(self, parsed):
@@ -128,7 +124,7 @@ class TestParseLstsvAllTypes:
 
     def test_matrix_choices_from_a_rows(self, parsed):
         _, choices, _ = parsed
-        codes = [c["name"] for c in choices["matrixheader_list"]]
+        codes = [c.name for c in choices["matrixheader_list"]]
         assert codes == ["none", "basic", "adv", "exp"]
 
 
@@ -146,12 +142,12 @@ class TestParseLstsvComplex:
 
     def test_select_multiple_choices(self, parsed):
         _, choices, _ = parsed
-        codes = [c["name"] for c in choices["favoritecolors_list"]]
+        codes = [c.name for c in choices["favoritecolors_list"]]
         assert set(codes) == {"red", "blue", "green", "yello"}
 
     def test_rank_choices(self, parsed):
         _, choices, _ = parsed
-        codes = [c["name"] for c in choices["lifepriorities_list"]]
+        codes = [c.name for c in choices["lifepriorities_list"]]
         assert codes == ["famil", "caree", "healt", "frien"]
 
 
@@ -160,17 +156,13 @@ class TestParseLstsvComplex:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not XMLLINT_AVAILABLE, reason="xmllint not available")
+@requires_xmllint
 @pytest.mark.parametrize("fixture", ["basic_survey", "all_types_survey", "complex_survey"])
 def test_lstsv_pipeline_validates_against_xsd(fixture, tmp_path):
     xml = build_ddi_xml(fixture, FIXTURES / f"{fixture}.tsv", [])
     out = tmp_path / f"{fixture}.xml"
     out.write_text(xml, encoding="utf-8")
-    result = subprocess.run(
-        ["xmllint", "--noout", "--schema", str(SCHEMA_PATH), str(out)],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 0, f"XSD validation failed:\n{result.stderr}"
+    validate_with_xsd(out)
 
 
 def test_build_data_csv_smoke():

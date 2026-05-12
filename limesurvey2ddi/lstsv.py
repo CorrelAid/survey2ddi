@@ -11,6 +11,8 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from survey2ddi_core.types import Choice
+
 LS_COLUMNS = [
     "class", "type/scale", "name", "relevance", "text", "help", "language",
     "validation", "em_validation_q", "mandatory", "other", "default",
@@ -39,7 +41,9 @@ YES_NO_CHOICES = [{"name": "Y", "label": "Yes"}, {"name": "N", "label": "No"}]
 GENDER_CHOICES = [{"name": "M", "label": "Male"}, {"name": "F", "label": "Female"}]
 
 
-def parse_lstsv(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
+def parse_lstsv(
+    path: Path,
+) -> tuple[list[dict], dict[str, tuple[Choice, ...]], dict]:
     """Parse a LimeSurvey TSV file. See module docstring for return shape."""
     with open(path, encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
@@ -192,7 +196,11 @@ def parse_lstsv(path: Path) -> tuple[list[dict], dict[str, list[dict]], dict]:
     if in_outer_group:
         survey_rows.append(_end_group_row())
 
-    return survey_rows, choices_by_list, settings
+    choices_final: dict[str, tuple[Choice, ...]] = {
+        list_name: tuple(Choice(name=c["name"], label=c["label"]) for c in items)
+        for list_name, items in choices_by_list.items()
+    }
+    return survey_rows, choices_final, settings
 
 
 def _detect_primary_language(rows: list[dict]) -> str:
@@ -213,6 +221,7 @@ def _build_settings(rows: list[dict], primary_lang: str) -> dict:
                 break
     return {
         "id_string": title or "limesurvey",
+        "form_title": title,
         "version": "1.0",
         "default_language": primary_lang,
     }

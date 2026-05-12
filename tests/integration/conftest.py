@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from kobo2ddi.ddi_xml import build_ddi_xml
+from survey2ddi_core.ddi_xml import build_ddi_xml
 
 COMPOSE_FILE = Path(__file__).parent / "docker-compose.validate.yml"
 QWACBACK_TAG = os.environ.get("QWACBACK_TAG", "latest")
