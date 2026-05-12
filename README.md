@@ -1,3 +1,5 @@
+[![PyPI](https://img.shields.io/pypi/v/survey2ddi.svg)](https://pypi.org/project/survey2ddi/)
+[![Python](https://img.shields.io/pypi/pyversions/survey2ddi.svg)](https://pypi.org/project/survey2ddi/)
 [![AI-Assisted](https://img.shields.io/badge/AI--assisted-Claude%20Code-blueviolet?logo=anthropic&logoColor=white)](./AI_DISCLOSURE.md)
 
 
@@ -113,6 +115,27 @@ xmllint --noout --schema tests/schemas/codebook.xsd output/<id>/<id>.xml
 ```
 
 The schema files in `tests/schemas/` are the official DDI-Codebook 2.5 XSD from the [DDI Alliance](https://ddialliance.org/Specification/DDI-Codebook/2.5/).
+
+## Releasing to PyPI
+
+Releases are published by [`/.github/workflows/publish.yml`](.github/workflows/publish.yml), which runs on any tag matching `v*`. Authentication is via [PyPI Trusted Publishers](https://docs.pypi.org/trusted-publishers/) (OIDC) — no API token is stored in the repo.
+
+To cut a new release:
+
+```bash
+# 1. Bump version in pyproject.toml
+# 2. Commit and tag
+git add pyproject.toml
+git commit -m "chore: release vX.Y.Z"
+git tag vX.Y.Z
+git push origin main --tags
+```
+
+The workflow builds with `uv build`, runs the test suite, and publishes the resulting sdist + wheel to https://pypi.org/project/survey2ddi/. Versions are hand-bumped — no automated semantic-release.
+
+One-time setup (already done for this repo):
+- PyPI → account → *Publishing* → add Trusted Publisher pointing at `CorrelAid/survey2ddi` workflow `publish.yml` in environment `pypi`.
+- GitHub → repo settings → *Environments* → create environment `pypi`.
 
 ## Known limitations
 
