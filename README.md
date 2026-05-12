@@ -72,6 +72,8 @@ uv run limesurvey2ddi transform <survey_id> --data path/to/export.csv --title "M
 
 The output will be saved in `output/<id>/` as `<id>.xml` and `<id>.csv`.
 
+Title resolution order: `--title` flag → `form_title` from XLSForm `settings` sheet (Kobo) / `surveyls_title` from TSV (LimeSurvey) → KoboToolbox API asset name (Kobo, only when `--data` not used) / survey ID (LimeSurvey) → `"Untitled"`. Omit `--title` when the schema already carries one; for Kobo this also skips the API call.
+
 ### Metadata only (no responses)
 
 If you only need the DDI codebook — e.g. before the survey is fielded, or to import the structure into [qwac](https://qwac.correlaid.org/) — skip the response data entirely. No API call, no CSV output.
