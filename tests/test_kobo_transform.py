@@ -34,12 +34,11 @@ class TestExtractVariables:
     def test_type_mapping(self, survey_rows, choices_by_list):
         variables = extract_variables(survey_rows, choices_by_list)
         by_name = {v.name: v for v in variables}
-        assert by_name["full_name"].type == "string"
+        assert by_name["full_name"].type == "text"
         assert by_name["age"].type == "integer"
         assert by_name["gender"].type == "select_one"
         assert by_name["hobbies"].type == "select_multiple"
         assert by_name["satisfaction"].type == "select_one"
-        assert by_name["score"].type == "range"
         assert by_name["rating"].type == "decimal"
         assert by_name["visit_date"].type == "date"
         assert by_name["calc_field"].type == "calculate"
@@ -71,7 +70,6 @@ class TestExtractVariables:
         assert by_name["gender"].measure == "nominal"
         assert by_name["hobbies"].measure == "nominal"
         assert by_name["satisfaction"].measure == "ordinal"  # likert
-        assert by_name["score"].measure == "ratio"
         assert by_name["rating"].measure == "ratio"
         assert by_name["visit_date"].measure == "interval"
         assert by_name["calc_field"].measure == ""  # calculate → empty

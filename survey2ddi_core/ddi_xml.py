@@ -15,50 +15,14 @@ from xml.dom.minidom import parseString
 
 from survey2ddi_core.types import Choice, Variable
 from survey2ddi_core.xlsform import extract_variables
+from survey2ddi_core._generated.type_mappings import (
+    DDI_TYPE_MAP,
+    RESPONSE_DOMAIN_MAP,
+)
 
 NS = "ddi:codebook:2_5"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 SCHEMA_LOC = "ddi:codebook:2_5 https://ddialliance.org/Specification/DDI-Codebook/2.5/XMLSchema/codebook.xsd"
-
-# Type → (intrvl attribute, varFormat/@type)
-DDI_TYPE_MAP = {
-    "select_one":            ("discrete",  "numeric"),
-    "select_multiple":       ("discrete",  "numeric"),
-    "select_one_from_file":  ("discrete",  "numeric"),
-    "select_multiple_from_file": ("discrete", "numeric"),
-    "rank":                  ("discrete",  "numeric"),
-    "integer":               ("contin",    "numeric"),
-    "decimal":               ("contin",    "numeric"),
-    "range":                 ("contin",    "numeric"),
-    "calculate":             ("discrete",  "character"),
-    "string":                ("discrete",  "character"),
-    "note":                  ("discrete",  "character"),
-    "date":                  ("discrete",  "character"),
-    "time":                  ("discrete",  "character"),
-    "datetime":              ("discrete",  "character"),
-    "acknowledge":           ("discrete",  "numeric"),
-    "hidden":                ("discrete",  "character"),
-}
-
-# Type → responseDomainType for <qstn>
-RESPONSE_DOMAIN_MAP = {
-    "select_one":            "category",
-    "select_multiple":       "multiple",
-    "select_one_from_file":  "category",
-    "select_multiple_from_file": "multiple",
-    "rank":                  "category",
-    "integer":               "numeric",
-    "decimal":               "numeric",
-    "range":                 "numeric",
-    "calculate":             "text",
-    "string":                "text",
-    "note":                  "text",
-    "date":                  "text",
-    "time":                  "text",
-    "datetime":              "text",
-    "acknowledge":           "text",
-    "hidden":                "text",
-}
 
 
 def _sanitize_id(name: str) -> str:
@@ -147,7 +111,7 @@ def _detect_other_patterns(variables: list[Variable]) -> dict[str, dict]:
     by_name = {v.name: v for v in variables}
     patterns: dict[str, dict] = {}
     for v in variables:
-        if v.type != "string" or not v.name.endswith("_other"):
+        if v.type != "text" or not v.name.endswith("_other"):
             continue
         base_name = v.name[: -len("_other")]
         base = by_name.get(base_name)

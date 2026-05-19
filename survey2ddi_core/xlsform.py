@@ -5,49 +5,17 @@ from pathlib import Path
 import openpyxl
 
 from survey2ddi_core.types import Choice, Variable
+from survey2ddi_core._generated.type_mappings import (
+    TYPE_MAP,
+    MEASURE_MAP,
+    METADATA_TYPES,
+    UNSUPPORTED_TYPES,
+    STRUCTURAL_TYPES,
+)
 
-# Types that don't carry respondent data (skipped entirely during extraction).
-# NOTE: `note` is intentionally NOT skipped — qwacback emits it as a text var
-# and we mirror that so output is interchangeable with qwacback's converter.
-SKIP_TYPES = {
-    "begin_group", "end_group", "begin_repeat", "end_repeat",
-    "start", "end", "today", "deviceid", "phonenumber",
-    "username", "audit",
-    # Repeat groups are skipped entirely — variables inside begin_repeat/end_repeat
-    # blocks are silently excluded.  KoboToolbox stores repeat data as nested
-    # arrays; supporting them requires a different data model.
-    # Unsupported for now
-    "geopoint", "geotrace", "geoshape",
-    "image", "audio", "video", "file", "barcode",
-}
-
-# XLSForm type → standardized type
-TYPE_MAP = {
-    "text": "string",
-    "note": "note",
-    "integer": "integer",
-    "decimal": "decimal",
-    "date": "date",
-    "time": "time",
-    "datetime": "datetime",
-    "calculate": "calculate",
-    "range": "range",
-    "acknowledge": "acknowledge",
-    "hidden": "hidden",
-}
-
-# Standardized type → measurement level (empty = leave for user to fill in)
-MEASURE_MAP = {
-    "select_one": "nominal",
-    "select_multiple": "nominal",
-    "rank": "ordinal",
-    "integer": "ratio",
-    "decimal": "ratio",
-    "range": "ratio",
-    "date": "interval",
-    "time": "interval",
-    "datetime": "interval",
-}
+# `note` intentionally NOT skipped (registry classifies it QuestionType).
+# `phonenumber` is in UNSUPPORTED_TYPES (registry-side decision).
+SKIP_TYPES: set[str] = METADATA_TYPES | UNSUPPORTED_TYPES | STRUCTURAL_TYPES
 
 
 def parse_xlsform(

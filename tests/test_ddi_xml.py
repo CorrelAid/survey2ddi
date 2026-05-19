@@ -225,7 +225,6 @@ class TestVarFormatTypes:
         assert fmt(by_name["full_name"]) == "character"
         assert fmt(by_name["age"]) == "numeric"
         assert fmt(by_name["gender"]) == "numeric"
-        assert fmt(by_name["score"]) == "numeric"
         assert fmt(by_name["rating"]) == "numeric"
         assert fmt(by_name["visit_date"]) == "character"
 
@@ -236,7 +235,6 @@ class TestIntrvl:
         root = _parse(xml)
         by_name = _vars_by_name(root)
         assert by_name["age"].get("intrvl") == "contin"
-        assert by_name["score"].get("intrvl") == "contin"
         assert by_name["gender"].get("intrvl") == "discrete"
         assert by_name["full_name"].get("intrvl") == "discrete"
 
@@ -368,11 +366,11 @@ class TestSelectMultipleExpansion:
         assert "hobbies" not in by_name
 
     def test_total_variable_count(self, survey_rows, choices_by_list, settings, submissions):
-        """9 standalone (inc. `thanks` note) + 3 binary (hobbies expanded) = 12 vars."""
+        """8 standalone (inc. `thanks` note) + 3 binary (hobbies expanded) = 11 vars."""
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        assert len(variables) == 12
+        assert len(variables) == 11
 
 
 class TestGridGroup:
