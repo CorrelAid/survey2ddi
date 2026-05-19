@@ -22,14 +22,20 @@ import io
 from survey2ddi_core.types import Variable
 
 
+def _data_carrying(variables: list[Variable]) -> list[Variable]:
+    """Drop variables that carry no respondent data (currently: ``note``)."""
+    return [v for v in variables if v.type != "note"]
+
+
 def get_canonical_columns(variables: list[Variable]) -> list[str]:
     """DDI variable names in the same order ``build_ddi_xml`` emits them.
 
     ``select_multiple`` is expanded to ``<name>_<choice>`` columns. All other
-    variables contribute a single column equal to ``v.name``.
+    variables contribute a single column equal to ``v.name``. ``note``
+    variables are skipped — they have no data column.
     """
     cols: list[str] = []
-    for v in variables:
+    for v in _data_carrying(variables):
         if v.type == "select_multiple":
             for c in v.choices:
                 cols.append(f"{v.name}_{c.name}")
@@ -53,9 +59,10 @@ def to_canonical_rows(
     ``get_canonical_columns(variables)``.
     """
     out: list[dict] = []
+    data_vars = _data_carrying(variables)
     for row in neutral_rows:
         canonical: dict[str, str] = {}
-        for v in variables:
+        for v in data_vars:
             raw = row.get(v.data_key, "")
             if v.type == "select_multiple":
                 selected = set(str(raw).split()) if raw else set()

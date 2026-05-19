@@ -366,11 +366,29 @@ class TestSelectMultipleExpansion:
         assert "hobbies" not in by_name
 
     def test_total_variable_count(self, survey_rows, choices_by_list, settings, submissions):
-        """8 standalone (inc. `thanks` note) + 3 binary (hobbies expanded) = 11 vars."""
+        """7 standalone data vars + 3 binary (hobbies expanded) = 10 vars.
+
+        ``thanks`` is a trailing ``note`` — routed to ``<stdyDscr>/<notes>``,
+        not ``<dataDscr>/<var>``.
+        """
         xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
         root = _parse(xml)
         variables = root.findall(".//ddi:dataDscr/ddi:var", NS)
-        assert len(variables) == 11
+        assert len(variables) == 10
+
+    def test_trailing_note_in_stdy_dscr(self, survey_rows, choices_by_list, settings, submissions):
+        """Outro ``note`` is emitted under ``<stdyDscr>/<notes>``, not as a var."""
+        xml = build_ddi_xml("Test", survey_rows, choices_by_list, settings, submissions)
+        root = _parse(xml)
+        # Not a var
+        by_name = _vars_by_name(root)
+        assert "thanks" not in by_name
+        # Is a <notes> under stdyDscr
+        notes = root.findall("./ddi:stdyDscr/ddi:notes", NS)
+        thanks = [n for n in notes if n.get("subject") == "thanks"]
+        assert len(thanks) == 1
+        assert thanks[0].get("type") == "instruction"
+        assert thanks[0].text == "Thank you!"
 
 
 class TestGridGroup:

@@ -13,6 +13,7 @@ from datetime import date
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 
+from survey2ddi_core.notes import classify_notes
 from survey2ddi_core.types import Choice, Variable
 from survey2ddi_core.xlsform import extract_variables
 from survey2ddi_core._generated.type_mappings import (
@@ -256,7 +257,10 @@ def build_ddi_xml(
 
     Same source-agnostic signature as ``build_workbook``.
     """
-    variables = extract_variables(survey_rows, choices_by_list)
+    all_variables = extract_variables(survey_rows, choices_by_list)
+    classified = classify_notes(all_variables)
+    variables = classified.data_vars
+    note_preqtxt = classified.inline_preqtxt
 
     title = (
         (asset_name or "").strip()
@@ -327,6 +331,13 @@ def build_ddi_xml(
         else:
             standalone_vars.append(v)
 
+    def _with_note(name: str, base: str = "") -> str:
+        """Prepend any inline note text recorded for *name* to *base*."""
+        note = note_preqtxt.get(name, "")
+        if note and base:
+            return f"{note}\n\n{base}"
+        return note or base
+
     # --- Emit varGrp elements first (XSD requires before var) ---
 
     # Grid groups — <txt> on the group and <preQTxt> on each member carry the
@@ -363,10 +374,12 @@ def build_ddi_xml(
 
     # --- Emit var elements ---
 
-    # Grid member variables
+    # Grid member variables — first member carries any preceding inline note,
+    # subsequent members just the group label as preQTxt.
     for group_name, members in grid_groups.items():
         group_label = _get_group_label(variables, group_name)
-        for v in members:
+        for i, v in enumerate(members):
+            pre = _with_note(v.name, group_label) if i == 0 else group_label
             _add_var_element(
                 data_dscr,
                 var_id=_make_var_id(v.name),
@@ -374,17 +387,19 @@ def build_ddi_xml(
                 label=v.label,
                 var_type=v.type,
                 choices=v.choices,
-                pre_q_txt=group_label,
+                pre_q_txt=pre,
             )
 
-    # Binary vars for select_multiple
+    # Binary vars for select_multiple — note attaches to the first binary's
+    # preQTxt so it precedes the question stem.
     for sm_name, sm_var in multi_resp_groups.items():
-        for choice in sm_var.choices:
+        for i, choice in enumerate(sm_var.choices):
+            stem = _with_note(sm_name, sm_var.label) if i == 0 else sm_var.label
             _add_binary_var(
                 data_dscr,
                 var_id=_make_var_id(f"{sm_name}_{choice.name}"),
                 name=f"{sm_name}_{choice.name}",
-                question_label=sm_var.label,
+                question_label=stem,
                 choice_label=choice.label,
             )
 
@@ -402,7 +417,19 @@ def build_ddi_xml(
             var_type=v.type,
             choices=v.choices,
             vocab=v.vocab,
+            pre_q_txt=_with_note(v.name),
         )
+
+    # --- Orphan notes (intro/outro/group-trailing) at end of stdyDscr ---
+    # DDI 2.5 child order: citation ... notes (last). Append after dataDscr
+    # is built so build order doesn't matter to user — element order is fine.
+    for note in classified.orphan_notes:
+        if not note.label:
+            continue
+        attrs = {"type": "instruction"}
+        if note.name:
+            attrs["subject"] = note.name
+        SubElement(stdy, "notes", **attrs).text = note.label
 
     # Pretty-print
     raw = tostring(root, encoding="unicode", xml_declaration=False)

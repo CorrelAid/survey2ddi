@@ -170,9 +170,10 @@ def test_build_data_csv_smoke():
     # Header line only (no responses)
     assert csv_str.endswith("\r\n")
     header = csv_str.splitlines()[0].split(",")
-    # Variables from basic_survey.tsv
-    for name in ("respondentname", "age", "consent", "thankyou"):
+    # Variables from basic_survey.tsv (note ``thankyou`` is a note → not in CSV)
+    for name in ("respondentname", "age", "consent"):
         assert name in header
+    assert "thankyou" not in header
 
 
 def test_build_ddi_xml_has_vars():
