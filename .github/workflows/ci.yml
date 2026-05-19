@@ -7,6 +7,14 @@ on:
     branches: [main]
 
 jobs:
+  registry-drift:
+    name: Registry Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check registry sync
+        run: bash scripts/check-registry-drift.sh
+
   test:
     name: Lint and Test
     runs-on: ubuntu-latest
