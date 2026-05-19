@@ -9,13 +9,18 @@ from survey2ddi_core._generated.type_mappings import (
     TYPE_MAP,
     MEASURE_MAP,
     METADATA_TYPES,
-    UNSUPPORTED_TYPES,
+    NON_DDI_EMITTABLE_TYPES,
     STRUCTURAL_TYPES,
 )
 
-# `note` intentionally NOT skipped (registry classifies it QuestionType).
-# `phonenumber` is in UNSUPPORTED_TYPES (registry-side decision).
-SKIP_TYPES: set[str] = METADATA_TYPES | UNSUPPORTED_TYPES | STRUCTURAL_TYPES
+# NON_DDI_EMITTABLE_TYPES = types lacking a ddi.intrvl block (note, geo*,
+# media, phonenumber, csv-external, ...). LS_UNSUPPORTED_TYPES is *not* used
+# here: it lists types unsupported by the LimeSurvey TSV parser, many of
+# which are still DDI-emittable (range, acknowledge, select_*_from_file).
+# `note` is excluded from skips so survey2ddi_core.notes.classify_notes can
+# route note rows to <preQTxt> on the next data var, or to <notes> under
+# <stdyDscr>. The CSV emitter drops notes separately.
+SKIP_TYPES: set[str] = (METADATA_TYPES | STRUCTURAL_TYPES | NON_DDI_EMITTABLE_TYPES) - {"note"}
 
 
 def parse_xlsform(
