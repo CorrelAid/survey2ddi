@@ -30,32 +30,38 @@ stays readable as a reference.
   lines of stdlib `xml.etree`. It's replaced by a documented snippet in
   formtransform (formtransform#15), not by a package.
 
-The trade, stated rather than hidden: the pull-and-convert path becomes
-node-only. Anyone scripting a Kobo pull from Python will need
-`npx github:CorrelAid/formtransform …` or a `subprocess` call. Say so plainly
-in the deprecation notice.
+**No API pulls (decided 2026-09-24).** formtransform does conversions only,
+and every conversion must also work in the browser, so it ships no Kobo or
+LimeSurvey API client. The replacement for `kobo2ddi pull` /
+`limesurvey2ddi pull` is the platform's own export step. That's the trade:
+state it plainly in the deprecation notice.
 
 ## What replaces what
 
 | survey2ddi today | Replacement | formtransform issue |
 | --- | --- | --- |
-| `kobo2ddi transform` / `metadata` | `formtransform xlsform2ddi [--data]` | [#10](https://github.com/CorrelAid/formtransform/issues/10) |
-| `limesurvey2ddi transform` / `metadata` | `formtransform lstsv2ddi [--data]` | [#11](https://github.com/CorrelAid/formtransform/issues/11) |
-| `kobo2ddi list` / `pull` | `formtransform kobo list` / `pull` | [#12](https://github.com/CorrelAid/formtransform/issues/12) |
-| `limesurvey2ddi list` / `pull` | `formtransform limesurvey list` / `pull` | [#13](https://github.com/CorrelAid/formtransform/issues/13) |
+| survey2ddi today | Replacement | formtransform |
+| --- | --- | --- |
+| `kobo2ddi transform` / `metadata` | `formtransform xlsform2ddi [--data]` | done ([#10](https://github.com/CorrelAid/formtransform/issues/10)) |
+| `limesurvey2ddi transform` / `metadata` | `formtransform lstsv2ddi [--data]` | done ([#11](https://github.com/CorrelAid/formtransform/issues/11)) |
+| `kobo2ddi list` / `pull` | Kobo's own export: form as XLSForm, data as CSV/JSON with XML values and headers | none needed |
+| `limesurvey2ddi list` / `pull` | LimeSurvey's response export with question-code headings and **answer codes** | none needed |
 | `test_conversion_equivalence.py` | same comparison against `buildDdiXml` | [#14](https://github.com/CorrelAid/formtransform/issues/14) |
 | `survey2ddi_core.ddi` reader | documented Python snippet | [#15](https://github.com/CorrelAid/formtransform/issues/15) |
 
-Check each issue's state before relying on it. As of 2026-09-24 only #10 was
-done.
+In the browser the same path is `parseResponses` → `buildDataCsv` /
+`lstsvToDataCsv`, all exported from formtransform's `src/index.ts`.
+
+**LimeSurvey: answer codes, not texts.** `limesurvey2ddi/client.py` exports
+with `responseType "long"`, which returns answer *labels* (`Ja`, `Yes`,
+`Fortgeschritten`; checked against LimeSurvey 6.16). The DDI categories hold
+answer *codes*, so survey2ddi's pulled LimeSurvey CSVs never matched their own
+codebook. The deprecation notice and formtransform#15 both have to name the
+export setting.
 
 formtransform is **not on the npm registry**. Install it with
 `npm install github:CorrelAid/formtransform`, run it with
 `npx github:CorrelAid/formtransform`, or use a local checkout's `dist/`.
-
-Env var names (`KOBO_API_TOKEN`, `LIME_SERVER_URL`, `LIME_USERNAME`,
-`LIME_PASSWORD`) don't change in the TS clients, so existing `.env` files
-keep working via `node --env-file`.
 
 ## Work here, in order
 
@@ -88,18 +94,21 @@ Suggested: `scripts/parity_gate.py`. Keep it out of `ci.yml`.
   - **finding**: anything else. File it on `CorrelAid/formtransform` with a
     minimal repro and link it from #3. A Python behaviour missing in TS is a
     formtransform bug.
-- **LimeSurvey CSV can't be compared yet.** It depends on formtransform#11.
-  Compare XML only for the TSVs until then.
+- **LimeSurvey CSV:** feed both sides the same export rows. Expect TS-only
+  improvements, not findings: arrays (`array[sq]`, which Python leaves empty),
+  `-oth-` → `other`, and the `<base>_other` companion. Python's
+  `normalize_responses` misses all three (see formtransform PR #20).
 - **Done =** results table in #3 plus a go/no-go for step 2.
 
-### 2. [#4](https://github.com/CorrelAid/survey2ddi/issues/4): final release 0.6.0 (gated on #3 and formtransform #10–#13)
+### 2. [#4](https://github.com/CorrelAid/survey2ddi/issues/4): final release 0.6.0 (gated on #3 and formtransform#15)
 
 - Every entry point still works and emits a `DeprecationWarning` naming the
   exact replacement. For CLI runs, print it on stderr too:
   `kobo2ddi`, `limesurvey2ddi`, and `survey2ddi_core.ddi`'s three functions
   (the last pointing at the formtransform#15 snippet).
 - Add a "Retired" notice at the top of the README with the replacement table
-  above and the node requirement.
+  above: the export steps for `pull`, and `npx github:CorrelAid/formtransform`
+  for the conversion commands.
 - Mark `pyproject.toml` `Development Status :: 7 - Inactive`.
 - To release, CI must be green. Delete the dead `Registry Drift Check` job
   in `.github/workflows/ci.yml`; it can't pass (see Why).
