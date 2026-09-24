@@ -1,135 +1,126 @@
-# Handover: shrinking survey2ddi to a DDI reader
+# Handover: retiring survey2ddi
 
 Audience: whoever (person or agent) picks up the survey2ddi retirement next,
 in this repo or in formtransform. This is the plan; each linked issue is written
 to stand on its own.
 
+**Decision (2026-09-24): survey2ddi is retired, not shrunk.** Everything it
+does moves to [`@correlaid/formtransform`](https://github.com/CorrelAid/formtransform).
+The package gets one last release that points every entry point at the
+replacement, and then the repo is archived. Nothing is deleted from the code
+first. An archived repo doesn't need a tidy tree, and the Python emitter
+stays readable as a reference.
+
 ## Why
 
-`survey2ddi_core/{data,ddi_xml,xlsform,notes,types}.py` + `_generated/` (~850
-lines) duplicate `@correlaid/formtransform` (`buildDdiXml`, `buildDataCsv`,
-`lstsvToDdiXml`). Two reasons this has to be fixed, not left alone:
+- **The implementations have already drifted.**
+  `survey2ddi_core/{data,ddi_xml,xlsform,notes,types}.py` + `_generated/`
+  (~850 lines) duplicate formtransform's `buildDdiXml`, `buildDataCsv` and
+  `lstsvToDdiXml`. `data.get_canonical_columns` returns input order, but
+  `ddi_xml.build_ddi_xml` emits bucketed order (grid → `select_multiple`
+  binaries → `_other` → standalone). So any survey with one of those gets a CSV
+  header that doesn't match its own XML. formtransform gets it right.
+- **The registry can't be resynced.** `scripts/check-registry-drift.sh` (the
+  first CI job) clones `CorrelAid/survey-type-registry`, which no longer
+  exists. Every fresh CI run fails with `could not read Username for
+  'https://github.com'`, and `_generated/` is stuck at `.registry-version`
+  v1.0.0.
+- **Keeping the reader alone isn't worth a package.** `survey2ddi_core/ddi.py`
+  (`read_variable_labels`, `read_value_maps`, `apply_value_labels`) is ~30
+  lines of stdlib `xml.etree`. It's replaced by a documented snippet in
+  formtransform (formtransform#15), not by a package.
 
-- **The two implementations have already drifted.** `data.get_canonical_columns` returns
-  input order, but `ddi_xml.build_ddi_xml` emits bucketed order (grid →
-  `select_multiple` binaries → `_other` → standalone). Any survey with one of
-  those gets a CSV header that doesn't match its own XML. formtransform gets it
-  right.
-- **The registry can't be resynced.** `scripts/sync-registry.sh` clones
-  `CorrelAid/survey-type-registry`, which no longer exists, so `_generated/`
-  is stuck at `.registry-version` v1.0.0 and `check-registry-drift.sh`
-  (first CI step) can't pass on a fresh run.
+The trade, stated rather than hidden: the pull-and-convert path becomes
+node-only. Anyone scripting a Kobo pull from Python will need
+`npx github:CorrelAid/formtransform …` or a `subprocess` call. Say so plainly
+in the deprecation notice.
 
-End state: survey2ddi = `survey2ddi_core/ddi.py` only (`read_variable_labels`,
-`read_value_maps`, `apply_value_labels`, already the entire `__all__`). All
-conversion and API pulls live in formtransform.
+## What replaces what
 
-The trade, stated rather than hidden: the ops path (pull + convert) becomes
-node-only. **Rejected alternative:** keep the Python CLIs and have them shell
-out to the `formtransform` binary. That makes a pip package depend on a node
-runtime it can't declare. If ops-in-Python turns out to be a hard requirement,
-fall back to it: keep `kobo2ddi` / `limesurvey2ddi` permanently and delete only
-the emit core.
-
-## Status of the formtransform side
-
-| Needed for | formtransform issue | State (2026-09-24) |
+| survey2ddi today | Replacement | formtransform issue |
 | --- | --- | --- |
-| `kobo2ddi transform` replacement | [#10](https://github.com/CorrelAid/formtransform/issues/10) `xlsform2ddi --data` | PR [#17](https://github.com/CorrelAid/formtransform/pull/17) open |
-| `limesurvey2ddi transform` replacement | [#11](https://github.com/CorrelAid/formtransform/issues/11) port `normalize_responses` | not started |
-| `kobo2ddi pull/list` replacement | [#12](https://github.com/CorrelAid/formtransform/issues/12) Kobo client | not started |
-| `limesurvey2ddi pull/list` replacement | [#13](https://github.com/CorrelAid/formtransform/issues/13) LimeSurvey client | not started |
-| keeping qwacback coverage | [#14](https://github.com/CorrelAid/formtransform/issues/14) port `test_conversion_equivalence.py` | not started |
+| `kobo2ddi transform` / `metadata` | `formtransform xlsform2ddi [--data]` | [#10](https://github.com/CorrelAid/formtransform/issues/10) |
+| `limesurvey2ddi transform` / `metadata` | `formtransform lstsv2ddi [--data]` | [#11](https://github.com/CorrelAid/formtransform/issues/11) |
+| `kobo2ddi list` / `pull` | `formtransform kobo list` / `pull` | [#12](https://github.com/CorrelAid/formtransform/issues/12) |
+| `limesurvey2ddi list` / `pull` | `formtransform limesurvey list` / `pull` | [#13](https://github.com/CorrelAid/formtransform/issues/13) |
+| `test_conversion_equivalence.py` | same comparison against `buildDdiXml` | [#14](https://github.com/CorrelAid/formtransform/issues/14) |
+| `survey2ddi_core.ddi` reader | documented Python snippet | [#15](https://github.com/CorrelAid/formtransform/issues/15) |
+
+Check each issue's state before relying on it. As of 2026-09-24 only #10 was
+done.
 
 formtransform is **not on the npm registry**. Install it with
 `npm install github:CorrelAid/formtransform`, run it with
 `npx github:CorrelAid/formtransform`, or use a local checkout's `dist/`.
 
+Env var names (`KOBO_API_TOKEN`, `LIME_SERVER_URL`, `LIME_USERNAME`,
+`LIME_PASSWORD`) don't change in the TS clients, so existing `.env` files
+keep working via `node --env-file`.
+
 ## Work here, in order
 
 ### 1. [#3](https://github.com/CorrelAid/survey2ddi/issues/3): parity gate (can start now)
 
-The script lives in this repo, because it runs the Python emitter and is
-deleted along with it. Suggested: `scripts/parity_gate.py`. Keep it out of
-`ci.yml`.
+The goal: prove formtransform isn't missing a behaviour before users are sent
+to it. The script is temporary, lives in this repo, and is archived with it.
+Suggested: `scripts/parity_gate.py`. Keep it out of `ci.yml`.
 
 - **Inputs.** The XLSForm rows in `tests/conftest.py` (`survey_rows`,
   `choices_by_list`, `settings`, `submissions`). There are no `.xlsx`
   fixtures. Also `examples/basic/` (`responses.json`, `101.csv`, `101.xml`)
-  and `tests/fixtures/lstsv/*.tsv` (`all_types`, `basic`, `complex`).
+  and `tests/fixtures/lstsv/*.tsv`.
 - **Python side:** `survey2ddi_core.ddi_xml.build_ddi_xml`,
   `survey2ddi_core.data.build_data_csv`, and for TSV
   `limesurvey2ddi.transform.build_ddi_xml(title, schema_path, responses)`.
 - **TS side: call the library, not the CLI.** Dump the same rows to JSON and
-  run a small node script that imports `buildDdiXml`, `buildDataCsv`,
-  `extractVariables` and `choicesByListFromRows` from formtransform's
-  `dist/index.js`, plus `lstsvToDdiXml` for the TSVs. The reason: the CLI's
-  XLSForm loader enforces a strict name subset (alnum ≤20, no underscores).
-  Fixture names like `full_name` fail that check, and `--skip-validation`
-  renames them, which would show up as false diffs.
+  run a small node script importing `buildDdiXml`, `buildDataCsv`,
+  `extractVariables`, `choicesByListFromRows` and `lstsvToDdiXml` from
+  formtransform's `dist/index.js`. The reason: the CLI's XLSForm loader
+  enforces a strict name subset (alnum ≤20, no underscores). Fixture names
+  like `full_name` fail that check, and `--skip-validation` renames them,
+  which would show up as false diffs.
 - **Pin the non-deterministic parts** on both sides: prod date, dataset
   filename, title.
-- **Compare byte-for-byte**, XML and CSV. Sort each difference into
-  one of three buckets:
+- **Compare byte-for-byte**, XML and CSV. Sort each difference into one of
+  three buckets:
   - **equal**
-  - **expected**: CSV column order only (Python uses input order, TS uses
-    bucketed order). The TS order is the correct one. Report it, don't fail on it.
-  - **finding**: anything else. A behaviour Python has and TS lacks is a
-    formtransform bug. File it on `CorrelAid/formtransform` with a minimal
-    repro and link it from #3. Don't keep the Python around as a workaround.
-- **LimeSurvey CSV can't be compared yet.** It depends on `normalize_responses`
-  (formtransform#11). Compare XML only for the TSVs and mark the CSV
-  "pending #11".
-- Already checked by hand: on a flat survey the two CSVs are byte-equal
-  (quoting, CRLF, `None` → empty cell, multi expansion).
-- **Done =** results table pasted into #3 plus an explicit go/no-go for step 2.
+  - **expected**: CSV column order only. The TS order is the correct one.
+  - **finding**: anything else. File it on `CorrelAid/formtransform` with a
+    minimal repro and link it from #3. A Python behaviour missing in TS is a
+    formtransform bug.
+- **LimeSurvey CSV can't be compared yet.** It depends on formtransform#11.
+  Compare XML only for the TSVs until then.
+- **Done =** results table in #3 plus a go/no-go for step 2.
 
-### 2. [#4](https://github.com/CorrelAid/survey2ddi/issues/4): delete the emit core (gated on #3 = go)
+### 2. [#4](https://github.com/CorrelAid/survey2ddi/issues/4): final release 0.6.0 (gated on #3 and formtransform #10–#13)
 
-- Delete `survey2ddi_core/{data,ddi_xml,xlsform,notes,types}.py`,
-  `_generated/`, `scripts/{sync-registry,check-registry-drift}.sh`,
-  `.registry-version`, the registry-drift step in `.github/workflows/ci.yml`,
-  and the `openpyxl` / `xlrd` dependencies.
-- Delete the tests that only cover the deleted code (`test_ddi_xml.py`,
-  `test_data.py`, most of `conftest.py`). Keep `test_ddi_utils.py`.
-- `tests/integration/test_conversion_equivalence.py` goes only after
-  formtransform#14 has taken over its coverage.
-- Keep `survey2ddi_core/ddi.py` and its `__init__` exports.
-- **Catch:** `kobo2ddi/cli.py` and `limesurvey2ddi/transform.py` import the
-  emit core. Either do this step after step 3's 1.0.0 removal, or have the
-  0.6.x CLIs shell out / fail with a pointer to formtransform. Don't ship a
-  release with broken imports.
+- Every entry point still works and emits a `DeprecationWarning` naming the
+  exact replacement. For CLI runs, print it on stderr too:
+  `kobo2ddi`, `limesurvey2ddi`, and `survey2ddi_core.ddi`'s three functions
+  (the last pointing at the formtransform#15 snippet).
+- Add a "Retired" notice at the top of the README with the replacement table
+  above and the node requirement.
+- Mark `pyproject.toml` `Development Status :: 7 - Inactive`.
+- To release, CI must be green. Delete the dead `Registry Drift Check` job
+  in `.github/workflows/ci.yml`; it can't pass (see Why).
+- Don't yank the earlier PyPI releases: pinned users must keep installing.
 
-### 3. [#5](https://github.com/CorrelAid/survey2ddi/issues/5): deprecate, then remove, the CLIs (gated on formtransform #10–#13)
+### 3. [#5](https://github.com/CorrelAid/survey2ddi/issues/5): archive (after 0.6.0 and formtransform#14)
 
-- **0.6.0:** `kobo2ddi` and `limesurvey2ddi` still work but emit a
-  `DeprecationWarning` naming the replacement (`formtransform xlsform2ddi
-  --data`, `formtransform kobo pull`, `formtransform limesurvey pull`).
-  `cmd_transform` / `cmd_metadata` repeat it on stderr.
-- **1.0.0:** drop both packages, `httpx` and `python-dotenv`,
-  `[project.scripts]` and `.env.example`. Update the wheel `packages` to
-  `["survey2ddi_core"]`.
-- Say plainly in the notice that the pull-and-convert path now needs
-  node (`npx github:CorrelAid/formtransform …`, or a subprocess call from Python).
-- Env var names (`KOBO_API_TOKEN`, `LIME_SERVER_URL`, `LIME_USERNAME`,
-  `LIME_PASSWORD`) don't change in the TS clients, so existing `.env` files
-  keep working via `node --env-file`.
-- Don't deprecate a command whose replacement isn't on formtransform `main`
-  yet.
+- Check once more that nothing in the org still depends on survey2ddi:
+  `gh search code survey2ddi --owner CorrelAid`. Expect only the docs covered by
+  [cdl-wp-eins#26](https://github.com/CorrelAid/cdl-wp-eins/issues/26).
+- Close the remaining issues. Put a one-line description on the repo pointing to
+  formtransform, then archive it (`gh repo archive CorrelAid/survey2ddi`).
 
-### 4. [#6](https://github.com/CorrelAid/survey2ddi/issues/6): rewrite the package's story (after #4)
-
-- Rewrite `README.md`, `AI_DISCLOSURE.md`, and the `pyproject.toml`
-  description and keywords for a DDI-reader package.
-- Check that `examples/basic/analysis_example.ipynb` still runs against the
-  checked-in `101.xml` with the emitter gone.
-- After that: [cdl-wp-eins#26](https://github.com/CorrelAid/cdl-wp-eins/issues/26)
-  retargets the public docs.
+[#6](https://github.com/CorrelAid/survey2ddi/issues/6) (rewrite as a DDI
+reader) is closed as not planned. The reader is now covered by formtransform#15.
 
 ## Rules
 
-- **No capability disappears to reach a green build.** If something has no TS
-  equivalent yet, stop and say so. Don't delete it.
-- **No step 2 without step 1.** Deleting the reference implementation without
-  the parity run means trusting it blindly.
+- **No capability disappears without a pointer.** Every entry point's
+  deprecation message names its replacement, and that replacement must be on
+  formtransform `main` before 0.6.0 ships.
+- **No 0.6.0 without #3.** Sending users to formtransform needs the parity run
+  behind it.
 - **Fix gaps in formtransform, not here.**
