@@ -1,7 +1,7 @@
 [project]
 name = "survey2ddi"
-version = "0.5.0"
-description = "Transform survey data (KoboToolbox, LimeSurvey) into DDI-adjacent formats"
+version = "0.6.0"
+description = "Retired: use CorrelAid/formtransform. Transform survey data (KoboToolbox, LimeSurvey) into DDI-adjacent formats"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "CorrelAid" }]
 keywords = ["ddi", "kobotoolbox", "limesurvey", "survey", "xlsform"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 7 - Inactive",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -52,6 +52,8 @@ markers = [
     "integration: requires docker + qwacback/schematron-worker images (opt-in)",
 ]
 addopts = "-m 'not integration'"
+# The retirement notice fires on every call; tests/test_retired.py checks it.
+filterwarnings = ["ignore:survey2ddi is retired:DeprecationWarning"]
 
 [project.scripts]
 kobo2ddi = "kobo2ddi.cli:main"

@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import io
 
+from survey2ddi_core.retired import KOBO_CONVERT, warn_retired
 from survey2ddi_core.types import Variable
 
 
@@ -84,6 +85,8 @@ def build_data_csv(
     Uses CRLF line endings and minimal quoting (only when a field contains
     a delimiter, quote, or line break).
     """
+    warn_retired("survey2ddi_core.data.build_data_csv", "formtransform's buildDataCsv, "
+                 "or the CLI: " + KOBO_CONVERT)
     cols = get_canonical_columns(variables)
     canonical_rows = to_canonical_rows(variables, neutral_rows)
 

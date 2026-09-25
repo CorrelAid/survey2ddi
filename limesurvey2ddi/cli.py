@@ -9,6 +9,7 @@ from pathlib import Path
 from limesurvey2ddi.client import LimeSurveyClient
 from limesurvey2ddi.lstsv import parse_lstsv
 from limesurvey2ddi.transform import build_data_csv, build_ddi_xml
+from survey2ddi_core.retired import LIME_CONVERT, LIME_EXPORT, warn_retired
 from survey2ddi_core.xlsform import resolve_title
 
 
@@ -128,6 +129,13 @@ def main(argv: list[str] | None = None) -> None:
     meta_p.add_argument("-o", "--output", help="Output XML path (default: <schema>.xml)")
 
     args = parser.parse_args(argv)
+    replacement = {
+        "list": LIME_EXPORT,
+        "pull": LIME_EXPORT,
+        "transform": LIME_CONVERT,
+        "metadata": LIME_CONVERT,
+    }.get(args.command, f"{LIME_EXPORT}; then {LIME_CONVERT}")
+    warn_retired(" ".join(filter(None, ["limesurvey2ddi", args.command])), replacement, cli=True)
     if not args.command:
         parser.print_help()
         sys.exit(1)

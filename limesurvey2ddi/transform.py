@@ -5,13 +5,23 @@ data, headers aligned to ``<var name="">`` in the XML — see ``survey2ddi_core.
 """
 
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
 
 from survey2ddi_core.data import build_data_csv as _build_data_csv
 from survey2ddi_core.ddi_xml import build_ddi_xml as _build_ddi_xml
+from survey2ddi_core.retired import LIME_CONVERT, warn_retired
 from survey2ddi_core.types import Choice, Variable
 from survey2ddi_core.xlsform import extract_variables
 from limesurvey2ddi.lstsv import parse_lstsv
+
+
+@contextmanager
+def _core_warnings_silenced():
+    """The core builders warn with Kobo replacements; this module already warned."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        yield
 
 
 def _norm(name: str) -> str:
@@ -121,17 +131,20 @@ def build_ddi_xml(
     dataset_filename: str = "data.csv",
 ) -> str:
     """Build a DDI-Codebook 2.5 XML string from a LimeSurvey survey-structure TSV."""
+    warn_retired("limesurvey2ddi.transform.build_ddi_xml", "formtransform's lstsvToDdiXml, "
+                 "or the CLI: " + LIME_CONVERT)
     survey_rows, choices_by_list, settings = parse_lstsv(lstsv_path)
     variables = extract_variables(survey_rows, choices_by_list)
     normalized = normalize_responses(variables, responses)
-    return _build_ddi_xml(
-        asset_name=survey_title,
-        survey_rows=survey_rows,
-        choices_by_list=choices_by_list,
-        settings=settings,
-        submissions=normalized,
-        dataset_filename=dataset_filename,
-    )
+    with _core_warnings_silenced():
+        return _build_ddi_xml(
+            asset_name=survey_title,
+            survey_rows=survey_rows,
+            choices_by_list=choices_by_list,
+            settings=settings,
+            submissions=normalized,
+            dataset_filename=dataset_filename,
+        )
 
 
 def build_data_csv(
@@ -139,7 +152,10 @@ def build_data_csv(
     responses: list[dict],
 ) -> str:
     """RFC 4180 CSV with DDI-aligned headers, from a LimeSurvey survey-structure TSV."""
+    warn_retired("limesurvey2ddi.transform.build_data_csv", "formtransform's lstsvToDataCsv, "
+                 "or the CLI: " + LIME_CONVERT)
     survey_rows, choices_by_list, _ = parse_lstsv(lstsv_path)
     variables = extract_variables(survey_rows, choices_by_list)
     normalized = normalize_responses(variables, responses)
-    return _build_data_csv(variables, normalized)
+    with _core_warnings_silenced():
+        return _build_data_csv(variables, normalized)
