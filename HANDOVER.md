@@ -4,6 +4,15 @@ Audience: whoever (person or agent) picks up the survey2ddi retirement next,
 in this repo or in formtransform. This is the plan; each linked issue is written
 to stand on its own.
 
+## Status (2026-09-25)
+
+| Step | State |
+| --- | --- |
+| [#3](https://github.com/CorrelAid/survey2ddi/issues/3) parity gate | **Done: go.** No missing behaviour; one cosmetic finding, [formtransform#75](https://github.com/CorrelAid/formtransform/issues/75) |
+| [#4](https://github.com/CorrelAid/survey2ddi/issues/4) release 0.6.0 | Deprecation notices, README notice, CI fix, version bump in [#10](https://github.com/CorrelAid/survey2ddi/pull/10) |
+| [#5](https://github.com/CorrelAid/survey2ddi/issues/5) archive | After 0.6.0 is on PyPI |
+| formtransform#10, #11, #14, #15 | All closed |
+
 **Decision (2026-09-24): survey2ddi is retired, not shrunk.** Everything it
 does moves to [`@correlaid/formtransform`](https://github.com/CorrelAid/formtransform).
 The package gets one last release that points every entry point at the
@@ -38,8 +47,6 @@ state it plainly in the deprecation notice.
 
 ## What replaces what
 
-| survey2ddi today | Replacement | formtransform issue |
-| --- | --- | --- |
 | survey2ddi today | Replacement | formtransform |
 | --- | --- | --- |
 | `kobo2ddi transform` / `metadata` | `formtransform xlsform2ddi [--data]` | done ([#10](https://github.com/CorrelAid/formtransform/issues/10)) |

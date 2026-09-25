@@ -14,6 +14,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 
 from survey2ddi_core.notes import classify_notes
+from survey2ddi_core.retired import KOBO_CONVERT, warn_retired
 from survey2ddi_core.types import Choice, Variable
 from survey2ddi_core.xlsform import extract_variables
 from survey2ddi_core._generated.type_mappings import (
@@ -257,6 +258,8 @@ def build_ddi_xml(
 
     Same source-agnostic signature as ``build_workbook``.
     """
+    warn_retired("survey2ddi_core.ddi_xml.build_ddi_xml", "formtransform's buildDdiXml, "
+                 "or the CLI: " + KOBO_CONVERT)
     all_variables = extract_variables(survey_rows, choices_by_list)
     classified = classify_notes(all_variables)
     variables = classified.data_vars

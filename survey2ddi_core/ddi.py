@@ -3,6 +3,8 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from survey2ddi_core.retired import READER, warn_retired
+
 NS = {"ddi": "ddi:codebook:2_5"}
 
 
@@ -23,6 +25,7 @@ def read_variable_labels(xml_source: str | Path | bytes) -> dict[str, str]:
 
     Returns a dict mapping variable names to their labels.
     """
+    warn_retired("survey2ddi_core.ddi.read_variable_labels", READER)
     root = _get_root(xml_source)
     labels = {}
     for var in root.findall(".//ddi:var", NS):
@@ -44,6 +47,11 @@ def read_value_maps(xml_source: str | Path | bytes) -> dict[str, dict[str, str]]
 
     Returns a dict mapping variable names to a mapping dict (code -> label).
     """
+    warn_retired("survey2ddi_core.ddi.read_value_maps", READER)
+    return _read_value_maps(xml_source)
+
+
+def _read_value_maps(xml_source: str | Path | bytes) -> dict[str, dict[str, str]]:
     root = _get_root(xml_source)
     maps = {}
     for var in root.findall(".//ddi:var", NS):
@@ -67,7 +75,8 @@ def apply_value_labels(df, xml_source: str | Path | bytes):
     Columns with categorical mappings in the XML will be converted to
     strings and remapped.
     """
-    value_maps = read_value_maps(xml_source)
+    warn_retired("survey2ddi_core.ddi.apply_value_labels", READER)
+    value_maps = _read_value_maps(xml_source)
     for col, mapping in value_maps.items():
         if col in df.columns:
             # We cast to string because DDI values are strings and CSVs

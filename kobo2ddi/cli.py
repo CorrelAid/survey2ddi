@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from kobo2ddi.client import KoboClient
+from survey2ddi_core.retired import KOBO_CONVERT, KOBO_EXPORT, warn_retired
 from survey2ddi_core.data import build_data_csv
 from survey2ddi_core.ddi_xml import build_ddi_xml
 from survey2ddi_core.xlsform import extract_variables, parse_xlsform, resolve_title
@@ -144,6 +145,13 @@ def main(argv: list[str] | None = None) -> None:
     meta_p.add_argument("-o", "--output", help="Output XML path (default: <form>.xml)")
 
     args = parser.parse_args(argv)
+    replacement = {
+        "list": KOBO_EXPORT,
+        "pull": KOBO_EXPORT,
+        "transform": KOBO_CONVERT,
+        "metadata": KOBO_CONVERT,
+    }.get(args.command, f"{KOBO_EXPORT}; then {KOBO_CONVERT}")
+    warn_retired(" ".join(filter(None, ["kobo2ddi", args.command])), replacement, cli=True)
     if not args.command:
         parser.print_help()
         sys.exit(1)
