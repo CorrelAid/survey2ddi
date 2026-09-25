@@ -7,6 +7,37 @@ This repository is part of the Civic Data Lab's [Survey Toolbox](https://umfrage
 
 # survey2ddi
 
+> [!WARNING]
+> **Retired.** survey2ddi is replaced by [**formtransform**](https://github.com/CorrelAid/formtransform), and this repository is archived. 0.6.0 is the last release. Every command still works but prints what to use instead. Older releases stay on PyPI.
+>
+> Step-by-step guide: [From survey responses to a DDI codebook + data file](https://github.com/CorrelAid/formtransform/blob/main/RESPONSE_DATA.md).
+
+## Moving to formtransform
+
+formtransform only converts files. It doesn't talk to Kobo or LimeSurvey, so the `list` and `pull` commands have **no replacement**. Export from the platform yourself (or script its API), then convert.
+
+| survey2ddi | Instead |
+| --- | --- |
+| `kobo2ddi list` / `pull` | Export from KoboToolbox: the form via *Form → ⋯ → Download XLS*, the data via *Data → Downloads*, CSV or JSON, **XML values and headers** |
+| `kobo2ddi transform` / `metadata` | `npx github:CorrelAid/formtransform xlsform2ddi form.xlsx -o codebook.xml [--data export.csv]` |
+| `limesurvey2ddi list` / `pull` | Export from LimeSurvey: *Responses → Export*, CSV, **Headings: Question code** and **Responses: Answer codes** |
+| `limesurvey2ddi transform` / `metadata` | `npx github:CorrelAid/formtransform lstsv2ddi survey.tsv -o codebook.xml [--data export.csv]` |
+| `survey2ddi_core.ddi` (`read_variable_labels`, `read_value_maps`, `apply_value_labels`) | Copy [`examples/python/ddi_reader.py`](https://github.com/CorrelAid/formtransform/blob/main/examples/python/ddi_reader.py) into your project: `variable_labels`, `value_labels`, `apply_value_labels` |
+| Python library (`build_ddi_xml`, `build_data_csv`) | formtransform's JS library: `buildDdiXml`, `buildDataCsv`, `lstsvToDdiXml`, `lstsvToDataCsv` (also runs in the browser) |
+
+formtransform isn't on the npm registry. Run it with `npx github:CorrelAid/formtransform …`, or install it with `npm install github:CorrelAid/formtransform`.
+
+What changes when you switch:
+
+- **LimeSurvey data now matches the codebook.** `limesurvey2ddi pull` exported answer *texts* (`Ja`, `Fortgeschritten`), but the codebook's categories hold answer *codes*. Export with *Answer codes*.
+- **Data survey2ddi dropped now comes through.** LimeSurvey arrays (`array[sq]`) and the native "other" option (`-oth-`, `q[other]`) now carry data. The data CSV's columns follow the XML's `<var>` order, and a `select_multiple` with an `other` choice plus a `<base>_other` text field no longer produces a duplicate column.
+- **Only supported types convert by default.** formtransform accepts only the question types in its registry. `calculate` (XLSForm), ranking (`R`) and equations (`*`) in LimeSurvey, `geopoint`, media types and similar are rejected with a message. Add `--skip-validation` to convert them anyway.
+- **No invented metadata.** For LimeSurvey TSVs, survey2ddi wrote the title as `<IDNo>` and a made-up `<version>1.0</version>`. formtransform leaves both out.
+
+Parity results and triage: [#3](https://github.com/CorrelAid/survey2ddi/issues/3). The rest of this README documents survey2ddi as it was.
+
+---
+
 **Bridge the gap between raw survey exports and archival-grade metadata.**
 
 Survey platforms like KoboToolbox and LimeSurvey are excellent for data collection, but their raw exports are often difficult to use for long-term archiving or secondary analysis. They frequently lack clear labels, structured metadata, and standardized formats.
