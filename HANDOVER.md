@@ -4,14 +4,19 @@ Audience: whoever (person or agent) picks up the survey2ddi retirement next,
 in this repo or in formtransform. This is the plan; each linked issue is written
 to stand on its own.
 
-## Status (2026-09-25)
+## Status (2026-09-25): done, repo archived
 
 | Step | State |
 | --- | --- |
 | [#3](https://github.com/CorrelAid/survey2ddi/issues/3) parity gate | **Done: go.** No missing behaviour; one cosmetic finding, [formtransform#75](https://github.com/CorrelAid/formtransform/issues/75) |
-| [#4](https://github.com/CorrelAid/survey2ddi/issues/4) release 0.6.0 | Deprecation notices, README notice, CI fix, version bump in [#10](https://github.com/CorrelAid/survey2ddi/pull/10) |
-| [#5](https://github.com/CorrelAid/survey2ddi/issues/5) archive | After 0.6.0 is on PyPI |
+| [#4](https://github.com/CorrelAid/survey2ddi/issues/4) release 0.6.0 | **Done.** [0.6.0 on PyPI](https://pypi.org/project/survey2ddi/0.6.0/) |
+| [#5](https://github.com/CorrelAid/survey2ddi/issues/5) archive | **Done.** No live code in the org depends on survey2ddi |
 | formtransform#10, #11, #14, #15 | All closed |
+
+Still open elsewhere: [cdl-wp-eins#26](https://github.com/CorrelAid/cdl-wp-eins/issues/26)
+(retarget the Toolbox docs to formtransform) and
+[formtransform#75](https://github.com/CorrelAid/formtransform/issues/75). The
+rest of this file is the plan as written.
 
 **Decision (2026-09-24): survey2ddi is retired, not shrunk.** Everything it
 does moves to [`@correlaid/formtransform`](https://github.com/CorrelAid/formtransform).
